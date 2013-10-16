@@ -196,8 +196,8 @@ class ssf_caller:
         """
         return segments and their copies in genome 
         coordinates
-        added 
-
+        adding subtraction of gaps
+        test
         """
         c=callset()
 
@@ -206,7 +206,7 @@ class ssf_caller:
         for i in xrange(len(wnd_starts)-1):
             start, end = self.starts[wnd_starts[i]], self.ends[wnd_ends[i]]
             
-            sum_exclude_bp = 0
+            #exclude totally anything in these tbxs
             for exclude_tbx in exclude_tbxs:
                 for l in exclude_tbx.fetch(self.chr,start,end,parser=pysam.asTuple()):
                     _chr,_s,_e = l
@@ -214,8 +214,6 @@ class ssf_caller:
                     e = min(end,int(_e))
                     sum_exclude_bp += e-s
                     
-            if float(sum_exclude_bp)/(end-start) > min_exclude_ratio: continue
-            
             l_var = self.l_vars[wnd_starts[i]]
             r_var = self.r_vars[wnd_ends[i]] 
 

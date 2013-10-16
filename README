@@ -1,0 +1,10 @@
+INTERESTING NOTE re: cython compilation
+
+So, distutils options are defined directly in the source files, however,
+include paths seem to have to be relative to the install directory, thus, 
+in ./ssf_DTS_caller/c_hierarchical_edge_merge.pyx, I define my sources as:
+
+# distutils: sources = ./ssf_DTS_caller/heap/heap.cc
+
+a bit wierd...
+

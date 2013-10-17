@@ -73,6 +73,8 @@ class null_distribution:
         self.mu_probDensByWidth = None
         self.ll_probDensByWidth = None
         self.initialized = False
+        self.all_var = None
+        self.all_mu = None
     
     def add_to_GC(self,gc_array,to_mask):
         gc_array = np.copy(gc_array) 
@@ -374,6 +376,18 @@ class null_distribution:
                 "n1" : call.values.shape[0] 
                 }
     
+    def get_all_var(self):
+        if self.all_var == None:
+            self.all_var = np.var(self.all_cps) 
+
+        return self.all_var
+    
+    def get_all_mu(self):
+        if self.all_mu == None:
+            self.all_mu = np.mean(self.all_cps) 
+
+        return self.all_mu
+
 
     def get_corrected_t_test_p_value(self,call):
         """
@@ -390,12 +404,13 @@ class null_distribution:
         n1=max(n1,2) #see the degrees of freedom, force it +ve
         n2=np.sqrt(self.all_cps.shape[0])
         
-        
         var1=np.var(call.values)
-        var2=np.var(self.all_cps)
+        #var2=np.var(self.all_cps)  #
+        var2=self.get_all_var()
 
         mu1=np.mean(call.values)
-        mu2=np.mean(self.all_cps)
+        #mu2=np.mean(self.all_cps)  #
+        mu2=self.get_all_mu()
 
         sX_X = np.sqrt( (var1/n1) + (var2/n2) )
         

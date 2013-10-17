@@ -18,7 +18,7 @@ from null_distribution import null_distribution
 from get_windowed_variance import get_windowed_variance
 
 class call:
-    def __init__(self, chr, start, end, value, wnd_start, wnd_end, values, l_var, r_var):
+    def __init__(self, chr, start, end, value, wnd_start, wnd_end, values):
 
         self.chr = chr
         self.start = start
@@ -29,9 +29,6 @@ class call:
         
         self.width = self.wnd_end - self.wnd_start + 1
          
-        self.l_var = l_var
-        self.r_var = r_var
-        
         self.values = values
         
         self.p_value = None
@@ -45,8 +42,8 @@ class callset:
     def __init__(self):
         self.calls = []
     
-    def add_call(self, chr, start, end, val, wnd_end, wnd_start, values, l_var, r_var):
-        self.calls.append(call(chr, start, end, val, wnd_end, wnd_start, values, l_var, r_var))
+    def add_call(self, chr, start, end, val, wnd_end, wnd_start, values):
+        self.calls.append(call(chr, start, end, val, wnd_end, wnd_start, values))
 
     def __iadd__(self, other):  
         self.calls += other.calls
@@ -192,30 +189,66 @@ class ssf_caller:
         self.segment_edges=(segments_s,segments_e,cps)
         print >>stderr, "hierarchical clustering completed in %fs"%(time.time()-t)  
     
+    def get_exclude_wnds(self, wnd_starts, wnd_ends, ex_starts, ex_ends):
+                                                    
+        mx=wnd_ends.shape[0]
+        n_exclude = len(ex_ends)     
+        ex_wnd_starts = np.searchsorted(wnd_ends, ex_starts)
+        ex_wnd_ends   = np.searchsorted(wnd_starts, ex_ends)
+        
+        ex_wnd_starts = np.amax(np.c_[ex_wnd_starts-1,np.zeros(n_exclude)],1).astype(int)
+        ex_wnd_ends = np.amin(np.c_[ex_wnd_ends+1,np.ones(n_exclude)*mx],1).astype(int)
+        
+        ex_wnds = [] 
+        
+        curr_s = ex_wnd_starts[0]
+        curr_e = ex_wnd_ends[0]
+
+        #print ex_wnd_starts
+        #print ex_wnd_ends
+
+        for i in xrange(1, n_exclude):
+            if ex_wnd_starts[i] < curr_e:
+                curr_e = ex_wnd_ends[i]
+            else:
+                ex_wnds.append(tuple([curr_s,curr_e]))
+                curr_s = ex_wnd_starts[i]
+                curr_e = ex_wnd_ends[i]
+        
+        ex_wnds.append(tuple([curr_s,curr_e]))
+        return ex_wnds
+
     def get_callset(self, exclude_tbxs=[], min_exclude_ratio=0.3):
         """
         return segments and their copies in genome 
         coordinates
         adding subtraction of gaps
-        test
         """
         c=callset()
 
         wnd_starts,wnd_ends,cps = self.segment_edges
+        wnd_starts,wnd_ends,cps = np.array(wnd_starts), np.array(wnd_ends), np.array(cps)
         
         for i in xrange(len(wnd_starts)-1):
             start, end = self.starts[wnd_starts[i]], self.ends[wnd_ends[i]]
             
             #exclude totally anything in these tbxs
             for exclude_tbx in exclude_tbxs:
+                ex_starts, ex_ends = [], []
                 for l in exclude_tbx.fetch(self.chr,start,end,parser=pysam.asTuple()):
                     _chr,_s,_e = l
-                    s = max(start,int(_s))
-                    e = min(end,int(_e))
-                    sum_exclude_bp += e-s
-                    
-            l_var = self.l_vars[wnd_starts[i]]
-            r_var = self.r_vars[wnd_ends[i]] 
+                    ex_starts.append(int(_s))
+                    ex_ends.append(int(_e))
+
+            n_exclude = len(ex_starts) 
+            if n_exclude:
+                print wnd_starts[i], wnd_ends[i]
+                ex_wnds = self.get_exclude_wnds(wnd_starts,
+                                                wnd_ends,
+                                                ex_starts,
+                                                ex_ends)
+                print ex_wnds
+
 
             c.add_call(self.chr,
                        self.starts[wnd_starts[i]],
@@ -223,9 +256,7 @@ class ssf_caller:
                        cps[i],
                        wnd_starts[i],
                        wnd_ends[i],
-                       self.cp_data[wnd_starts[i]:wnd_ends[i]],
-                       l_var,
-                       r_var)
+                       self.cp_data[wnd_starts[i]:wnd_ends[i]])
         return c 
 
     def get_n_edges(self,der1,der2,n=0):

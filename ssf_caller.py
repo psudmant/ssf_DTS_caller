@@ -298,13 +298,6 @@ class ssf_caller:
             else:
                 wnd_start_ends = [tuple([wnd_start, wnd_end])]
             
-            #print np.median(self.cp_data[wnd_start:wnd_end]),np.mean(self.cp_data[wnd_start:wnd_end])
-            #print cps[i]
-            #print self.starts[wnd_start], self.starts[wnd_starts[i]]
-            #print self.ends[wnd_end], self.ends[wnd_ends[i]]
-            #print np.mean(self.cp_data[wnd_start:wnd_end]), cps[i]
-            #print wnd_start, wnd_starts[i]
-            #print wnd_end, wnd_ends[i]
             for i in xrange(len(wnd_start_ends)):
                 wnd_start = wnd_start_ends[i][0]
                 wnd_end = wnd_start_ends[i][1]

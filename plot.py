@@ -173,7 +173,7 @@ class line_plot:
         count=0
         max_count=10
         #for gene_line in tabix.Tabix(fn_genes).fetch(self.chr,self.start,self.end):
-        tbx_genes = pysam.Tabixfile(fn_dups) 
+        tbx_genes = pysam.Tabixfile(fn_genes) 
         for gene_line in tbx_genes.fetch(self.chr,self.start,self.end):
             sline=gene_line.split()
             start,end,name=int(sline[4]),int(sline[5]),sline[12]
@@ -347,12 +347,12 @@ class line_plot:
         for call in calls:
             x=(call.start+call.end)/2.0
             if call.fdr_significant:
-                self.axes.annotate("%e.5 %d L%.3f R%.3f"%(call.p_value,call.significance_level,call.l_var, call.r_var), xy=(x,-.5), xytext=(x,-1), rotation=45, ha='right', 
+                self.axes.annotate("%e.5 %d"%(call.p_value,call.significance_level), xy=(x,-.5), xytext=(x,-1), rotation=45, ha='right', 
                                    arrowprops=dict(color='red', facecolor='red',width=.002,headwidth=1,frac=.5),
                                    fontsize=5,
                                    color='red')
             else:
-                self.axes.annotate("%e.5 %d L%.3f R%.3f"%(call.p_value,call.significance_level,call.l_var, call.r_var), xy=(x,-.5), xytext=(x,-1), rotation=45, ha='right', 
+                self.axes.annotate("%e.5 %d"%(call.p_value,call.significance_level), xy=(x,-.5), xytext=(x,-1), rotation=45, ha='right', 
                                    arrowprops=dict(color='blue',facecolor='blue',width=.002,headwidth=1,frac=.5),
                                    fontsize=3,
                                    color='blue')

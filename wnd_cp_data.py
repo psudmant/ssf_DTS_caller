@@ -24,7 +24,7 @@ class dCGH():
             
             for i in xrange(nans_locs.shape[0]):
                 start,end=nans_locs[i]
-                l=start==0 and end or start-1
+                l=(start==0) and end or start-1
                 r=end>=(ratios.shape[0]-1) and start-1 or end
                 ratios[start:end] = (ratios[l]+ratios[r])/2.0 
             

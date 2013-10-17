@@ -189,34 +189,83 @@ class ssf_caller:
         self.segment_edges=(segments_s,segments_e,cps)
         print >>stderr, "hierarchical clustering completed in %fs"%(time.time()-t)  
     
-    def get_exclude_wnds(self, wnd_starts, wnd_ends, ex_starts, ex_ends):
+    def get_exclude_coords(self, ex_starts, ex_ends):
                                                     
-        mx=wnd_ends.shape[0]
+        mx=self.starts.shape[0]-1
         n_exclude = len(ex_ends)     
-        ex_wnd_starts = np.searchsorted(wnd_ends, ex_starts)
-        ex_wnd_ends   = np.searchsorted(wnd_starts, ex_ends)
-        
+        ex_wnd_starts = np.searchsorted(self.starts, ex_starts)
+        ex_wnd_ends   = np.searchsorted(self.ends, ex_ends)
         ex_wnd_starts = np.amax(np.c_[ex_wnd_starts-1,np.zeros(n_exclude)],1).astype(int)
         ex_wnd_ends = np.amin(np.c_[ex_wnd_ends+1,np.ones(n_exclude)*mx],1).astype(int)
+        ex_starts = self.starts[ex_wnd_starts] 
+        ex_ends = self.ends[ex_wnd_ends] 
+
+        ex_coords = [] 
         
-        ex_wnds = [] 
-        
-        curr_s = ex_wnd_starts[0]
-        curr_e = ex_wnd_ends[0]
+        curr_s = ex_starts[0]
+        curr_e = ex_ends[0]
 
         #print ex_wnd_starts
         #print ex_wnd_ends
 
         for i in xrange(1, n_exclude):
-            if ex_wnd_starts[i] < curr_e:
-                curr_e = ex_wnd_ends[i]
+            if ex_starts[i] < curr_e:
+                curr_e = ex_ends[i]
             else:
-                ex_wnds.append(tuple([curr_s,curr_e]))
-                curr_s = ex_wnd_starts[i]
-                curr_e = ex_wnd_ends[i]
+                ex_coords.append(tuple([curr_s,curr_e]))
+                curr_s = ex_starts[i]
+                curr_e = ex_ends[i]
         
-        ex_wnds.append(tuple([curr_s,curr_e]))
-        return ex_wnds
+        ex_coords.append(tuple([curr_s,curr_e]))
+        return ex_coords
+
+    def subtract_excluded(self, wnd_start, wnd_end, ex_coords):
+        """
+        subtract the exclusion coordinates from the full call
+        ea. output '.'s exclude 'x's over cal '-'s
+           ------------------------
+          xxxx....xx....xxx....xxxxxx
+        """
+        start = self.starts[wnd_start]
+        end = self.ends[wnd_end]
+
+        #wnd_start-wnd_end totally encompassed by gap
+        if start >= ex_coords[0][0] and end <= ex_coords[0][1]:
+            return []
+        
+        #starting wnd, either the end of the first gap, or the start of the wnd
+        if start >= ex_coords[0][0]:
+            init = ex_coords[0][1] 
+            ex_coords.pop(0)
+        else:
+            init = start
+        
+        #ending wnd, either the start of the last gap, or the end of the wnd
+        if len(ex_coords)>0 and end<=ex_coords[-1][1]:
+            final = ex_coords[-1][0]  
+            ex_coords.pop()
+        else:
+            final = end 
+        
+        regions = [init, final]
+        
+        for ex in ex_coords: 
+            regions.append(ex[0])
+            regions.append(ex[1])
+        
+        regions = sorted(regions)
+        
+        final_wnds = []
+        
+        i=0
+        while i<len(regions):
+            final_wnds.append(tuple([np.where(self.starts == regions[i])[0][0],
+                                     np.where(self.ends == regions[i+1])[0][0]
+                                    ]))
+            i+=2
+        
+        return final_wnds
+        
 
     def get_callset(self, exclude_tbxs=[], min_exclude_ratio=0.3):
         """
@@ -231,6 +280,7 @@ class ssf_caller:
         
         for i in xrange(len(wnd_starts)-1):
             start, end = self.starts[wnd_starts[i]], self.ends[wnd_ends[i]]
+            wnd_start, wnd_end = wnd_starts[i], wnd_ends[i]
             
             #exclude totally anything in these tbxs
             for exclude_tbx in exclude_tbxs:
@@ -242,21 +292,30 @@ class ssf_caller:
 
             n_exclude = len(ex_starts) 
             if n_exclude:
-                print wnd_starts[i], wnd_ends[i]
-                ex_wnds = self.get_exclude_wnds(wnd_starts,
-                                                wnd_ends,
-                                                ex_starts,
-                                                ex_ends)
-                print ex_wnds
+                ex_coords = self.get_exclude_coords(ex_starts, ex_ends)
 
+                wnd_start_ends = self.subtract_excluded(wnd_start, wnd_end, ex_coords)
+            else:
+                wnd_start_ends = [tuple([wnd_start, wnd_end])]
+            
+            #print np.median(self.cp_data[wnd_start:wnd_end]),np.mean(self.cp_data[wnd_start:wnd_end])
+            #print cps[i]
+            #print self.starts[wnd_start], self.starts[wnd_starts[i]]
+            #print self.ends[wnd_end], self.ends[wnd_ends[i]]
+            #print np.mean(self.cp_data[wnd_start:wnd_end]), cps[i]
+            #print wnd_start, wnd_starts[i]
+            #print wnd_end, wnd_ends[i]
+            for i in xrange(len(wnd_start_ends)):
+                wnd_start = wnd_start_ends[i][0]
+                wnd_end = wnd_start_ends[i][1]
 
-            c.add_call(self.chr,
-                       self.starts[wnd_starts[i]],
-                       self.ends[wnd_ends[i]],
-                       cps[i],
-                       wnd_starts[i],
-                       wnd_ends[i],
-                       self.cp_data[wnd_starts[i]:wnd_ends[i]])
+                c.add_call(self.chr,
+                           self.starts[wnd_start],
+                           self.ends[wnd_end],
+                           np.mean(self.cp_data[wnd_start:wnd_end]),
+                           wnd_start,
+                           wnd_end,
+                           self.cp_data[wnd_start:wnd_end])
         return c 
 
     def get_n_edges(self,der1,der2,n=0):

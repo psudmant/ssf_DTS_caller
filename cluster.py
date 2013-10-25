@@ -18,9 +18,9 @@ class callset_table:
     a callset table must have columns with a test, reference
         indiv_ref
         indiv_test
-        chr
-        start
-        end
+        *chr
+        *start
+        *end
         mu
         p
         window_size
@@ -50,6 +50,9 @@ class callset_table:
 class cluster_calls:
     
     def __init__(self, callset_table):
+        """
+        callset_table is a pandas
+        """
         self.callset_table = copy.deepcopy(callset_table)
         self.callset_table.sort()
         self.overlapping_calls_by_chr, self.n_overlapping = self.get_overlapping_calls()

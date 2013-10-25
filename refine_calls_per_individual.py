@@ -28,6 +28,8 @@ if __name__=="__main__":
 
     """
     make a call clusterer and use it to get clustered calls
+    fn_call_table has all calls made with multiple references
+    against the individual
     """
     name = o.fn_call_table.split("/")[-1].split(".")[0]
     call_clusterer = cluster.cluster_calls(call_table)

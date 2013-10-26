@@ -34,9 +34,15 @@ class callset_table:
                                      compression = 'gzip')
         print >>stderr, "done"
 
-    def filter(self, p_cutoff):
-        print >>stderr, "parsing calls with p>%f..."%(p_cutoff)
-        self.pd_table = self.pd_table[self.pd_table['p']<p_cutoff]
+    def filter(self, p_cutoff, size_cutoff):
+        """
+        apply size cutoff (no calls of size 1 window!)
+        """
+        print >>stderr, "parsing calls with p<=%f and l>=%d..."%(p_cutoff, size_cutoff)
+        self.pd_table = self.pd_table[(self.pd_table['p']<p_cutoff)]
+        self.pd_table = self.pd_table[(self.pd_table['window_size']>=size_cutoff)]
+        #self.pd_table = self.pd_table[( (self.pd_table['window_size']>=size_cutoff) |
+        #                                (self.pd_table['p']>0) )]
         print >>stderr, "done"
     
     def sort(self):
@@ -63,7 +69,7 @@ class cluster_calls:
         resolve overlapping clusters into individual calls 
         let the calls have likelihoods
         """
-        ll_cutoff = -20.0
+        ll_cutoff = -6.0
         print >>stderr, "resolving breakpoints..."
         final_calls = []
         
@@ -200,7 +206,7 @@ class call_cluster:
     
     def print_out(self):
         for c in self.calls:
-            print "\t", c['chr'], c['start'], c['end'], np.log10(c['p'])
+            print "\t", c['chr'], c['start'], c['end'], np.log10(c['p']), c['window_size']
 
     def frac_overlap(self, i, j):
         si, ei = self.calls[i]['start'],  self.calls[i]['end']  
@@ -310,14 +316,13 @@ class CNV_call:
         self.clustered_calls = clustered_calls
         self.chr = chr
         
-        min_start = 99999999999999
-        max_end = -9
+        best_ll = 1
         for clust in clustered_calls:
-            min_start = min(min_start,clust.get_med_start())
-            max_end = max(max_end,clust.get_med_end())
-        self.start = min_start
-        self.end = max_end
-        self.log_likelihood=np.sum(np.array([c.get_log_likelihood() for c in clustered_calls]))
+            if clust.get_log_likelihood() < best_ll:
+            self.start = clust.get_med_start()
+            self.end = clust.get_med_end()
+        
+        self.log_likelihood=best_ll
     
     def print_str(self):
         return "%s\t%d\t%d\t%f"%(self.chr, self.start, self.end, self.log_likelihood)

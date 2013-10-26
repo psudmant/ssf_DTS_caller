@@ -110,7 +110,7 @@ class callset:
                                                     call.value,
                                                     call.p_value,
                                                     call.fdr_significant and "*" or "-",
-                                                    (call.wnd_end-call.wnd_start+1),
+                                                    (call.wnd_end-call.wnd_start),
                                                     additional)
 
 class ssf_caller:

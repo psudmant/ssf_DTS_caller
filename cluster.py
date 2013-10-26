@@ -58,7 +58,7 @@ class cluster_calls:
         self.overlapping_calls_by_chr, self.n_overlapping = self.get_overlapping_calls()
         print >>stderr, "%d overlapping calls"%self.n_overlapping
     
-    def resolve_overlapping_clusters(self):
+    def resolve_overlapping_clusters(self, verbose=False):
         """
         resolve overlapping clusters into individual calls 
         let the calls have likelihoods
@@ -66,10 +66,14 @@ class cluster_calls:
         ll_cutoff = -20.0
         print >>stderr, "resolving breakpoints..."
         final_calls = []
-
+        
         for chr, overlapping_calls in self.overlapping_calls_by_chr.iteritems():
             for overlap_cluster in overlapping_calls:
-                final_calls += overlap_cluster.resolve(0.85, ll_cutoff, min_size=2)
+                resolved_calls = overlap_cluster.resolve(0.85, ll_cutoff, min_size=2)
+                final_calls += resolved_calls
+                if verbose:
+                    for call in resolved_calls:
+                        call.print_verbose()
                     
         print >>stderr, "done"
         print >>stderr, "%d calls with likelihood <%f"%(len(final_calls), ll_cutoff)
@@ -154,9 +158,6 @@ def get_overlapping_call_clusts(recip_overlap_clusts):
         
     return nx.connected_components(G)
 
-    
-
-
 class call_cluster:
     def __init__(self, chr):
         self.calls = []
@@ -190,10 +191,9 @@ class call_cluster:
 
     def get_log_likelihood(self, force=False):
 
-        if self.log_likelihood == None or False:
+        if self.log_likelihood == None or force:
             self.log_likelihood= np.sum(np.log10(np.array([call['p'] for call in self.calls])))
         return self.log_likelihood
-            
 
     def get_range_str(self):
         return "%s:%d-%d"%(self.chr,min(self.all_starts), max(self.all_ends))
@@ -269,6 +269,11 @@ class call_cluster:
         return new_groups
         
     def resolve(self, overlap_cutoff, ll_cutoff, min_size=1, do_plot=False):
+        """
+        though a bunch of calls may overlap, they may not be all 'good'
+        or all the same call. Thus, further cluster overlapping calls
+        into those with reciprocal overlap properties
+        """
          
         if self.size <min_size: 
             return []
@@ -316,6 +321,16 @@ class CNV_call:
     
     def print_str(self):
         return "%s\t%d\t%d\t%f"%(self.chr, self.start, self.end, self.log_likelihood)
+    
+    def print_verbose(self):
+        print "%s\t%d\t%d\tll:%f\t%d clusts"%(self.chr, 
+                                              self.start, 
+                                              self.end, 
+                                              self.log_likelihood, 
+                                              len(self.clustered_calls))
+        for clust in self.clustered_calls:
+            print clust.chr, clust.get_med_start(), clust.get_med_end()
+            clust.print_out()
 
 
     """ 

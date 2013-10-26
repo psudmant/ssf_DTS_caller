@@ -405,6 +405,7 @@ class null_distribution:
         n2=np.sqrt(self.all_cps.shape[0])
         
         var1=np.var(call.values)
+        if var1 == 0.0: return 0.5
         #var2=np.var(self.all_cps)  #
         var2=self.get_all_var()
 
@@ -422,6 +423,8 @@ class null_distribution:
         
         p = stats.t.cdf(T,df)
         p = min(p,1-p)
+        #if p==0.0:  
+        #    print p, n1, n2, var1, var2, mu1, mu2, sX_X, df, T
         return p 
 
     def get_t_test_p_value(self,call):

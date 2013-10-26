@@ -20,12 +20,13 @@ if __name__=="__main__":
     opts.add_option('', '--call_table', dest='fn_call_table')
     opts.add_option('', '--out_indiv_calls_bed', dest='fn_out_indiv_calls_bed')
     opts.add_option('', '--out_resolved', dest='fn_out_resolved')
-    opts.add_option('', '--p_cutoff', dest='p_cutoff', type=float, default=0.001)
+    opts.add_option('', '--p_cutoff', dest='p_cutoff', type=float, default=0.005)
+    opts.add_option('', '--min_wnd_call_size', dest='min_wnds', type=int, default=2)
     (o, args) = opts .parse_args()
     
     call_table = cluster.callset_table(o.fn_call_table) 
-    call_table.filter(o.p_cutoff) 
-
+    call_table.filter(o.p_cutoff, o.min_wnds) 
+    
     """
     make a call clusterer and use it to get clustered calls
     fn_call_table has all calls made with multiple references
@@ -34,7 +35,7 @@ if __name__=="__main__":
     name = o.fn_call_table.split("/")[-1].split(".")[0]
     call_clusterer = cluster.cluster_calls(call_table)
     #call_clusterer.output_overlap_clusters(o.fn_out_indiv_calls_bed, name)
-    final_calls = call_clusterer.resolve_overlapping_clusters(verbose=True)
+    final_calls = call_clusterer.resolve_overlapping_clusters(verbose=False)
     output_calls(final_calls, o.fn_out_resolved)
     
 

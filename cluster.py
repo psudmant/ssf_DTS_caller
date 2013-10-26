@@ -319,13 +319,19 @@ class CNV_call:
         best_ll = 1
         for clust in clustered_calls:
             if clust.get_log_likelihood() < best_ll:
-            self.start = clust.get_med_start()
-            self.end = clust.get_med_end()
+                self.best_start = clust.get_med_start()
+                self.best_end = clust.get_med_end()
         
-        self.log_likelihood=best_ll
+        self.best_log_likelihood=best_ll
     
     def print_str(self):
-        return "%s\t%d\t%d\t%f"%(self.chr, self.start, self.end, self.log_likelihood)
+        
+        outstr=""
+        for clust in self.clustered_calls:
+            start = clust.get_med_start()
+            end = clust.get_med_end()
+            outstr+="%s\t%d\t%d\t%f\n"%(self.chr, start, end, clust.get_log_likelihood())
+        return outstr
     
     def print_verbose(self):
         print "%s\t%d\t%d\tll:%f\t%d clusts"%(self.chr, 

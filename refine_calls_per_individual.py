@@ -12,7 +12,7 @@ def output_calls(final_calls, fn):
     
     with open(fn, "w") as F:
         for call in final_calls:
-            F.write("%s\n"%call.print_str())
+            F.write("%s"%call.print_str())
 
 if __name__=="__main__":
     

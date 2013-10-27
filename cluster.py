@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import scipy.spatial.distance as dist 
 from sets import Set
 import networkx as nx
+import time
 
 class callset_table:
     """
@@ -28,11 +29,12 @@ class callset_table:
 
     def __init__(self, fn_table):
         print >>stderr, "loading table..."
+        t=time.time()
         self.pd_table =  pd.read_csv(fn_table, 
                                      sep = '\t', 
                                      header=0, 
                                      compression = 'gzip')
-        print >>stderr, "done"
+        print >>stderr, "done (%fs)"%(time.time()-t)
 
     def filter(self, p_cutoff, size_cutoff):
         """
@@ -50,8 +52,9 @@ class callset_table:
         sort on chr, start, end
         """
         print >>stderr, "sorting..."
+        t=time.time()
         self.pd_table = self.pd_table.sort(['chr', 'start', 'end', 'p'])
-        print >>stderr, "done"
+        print >>stderr, "done (%fs)"%(time.time()-t)
 
 class cluster_calls:
     
@@ -156,9 +159,9 @@ def get_overlapping_call_clusts(recip_overlap_clusts):
         G.add_node(clust)
 
     for clust1 in recip_overlap_clusts:
-        si, ei = clust1.get_med_start(), clust1.get_med_end()
+        si, ei = clust1.get_best_start(), clust1.get_best_end()
         for clust2 in recip_overlap_clusts:
-            sj, ej = clust2.get_med_start(), clust2.get_med_end()
+            sj, ej = clust2.get_best_start(), clust2.get_best_end()
             if intersect(si,ei,sj,ej):
                 G.add_edge(clust1, clust2)
         
@@ -183,17 +186,43 @@ class call_cluster:
         self.all_starts.append(call['start'])
         self.all_ends.append(call['end'])
         self.size+=1
-    
+    def get_indiv_calls_str(self):
+        ret_str = ""
+        for call in self.calls:
+            ret_str+="%s\n"%("\t".join([str(s) for s in [call["indiv_ref"], 
+                                               call["indiv_test"], 
+                                               call["chr"],
+                                               call["start"], 
+                                               call["end"], 
+                                               call["mu"],
+                                               call["p"], 
+                                               call["window_size"]]]))
+        return ret_str
+            
     #def get_start(self):
     #    if size==1:
     #        return self.calls[0]['start']
     #    elif not selfcomplex
 
-    def get_med_start(self):
-        return np.median(np.array(self.all_starts))
+    def get_best_start(self):
+        dd_starts = defaultdict(int)
+        for call in self.calls:
+            dd_starts[call['start']]+=np.log10(call['p'])
+        
+        return sorted(dd_starts.iteritems(), key=lambda x: x[1])[0][0]
     
-    def get_med_end(self):
-        return np.median(np.array(self.all_ends))
+    def get_best_end(self):
+        dd_starts = defaultdict(int)
+        for call in self.calls:
+            dd_starts[call['end']]+=np.log10(call['p'])
+        
+        return sorted(dd_starts.iteritems(), key=lambda x: x[1])[0][0]
+
+    #def get_med_start(self):
+    #    return np.median(np.array(self.all_starts))
+    #
+    #def get_med_end(self):
+    #    return np.median(np.array(self.all_ends))
 
     def get_log_likelihood(self, force=False):
 
@@ -319,8 +348,8 @@ class CNV_call:
         best_ll = 1
         for clust in clustered_calls:
             if clust.get_log_likelihood() < best_ll:
-                self.best_start = clust.get_med_start()
-                self.best_end = clust.get_med_end()
+                self.best_start = clust.get_best_start()
+                self.best_end = clust.get_best_end()
         
         self.best_log_likelihood=best_ll
     
@@ -328,9 +357,16 @@ class CNV_call:
         
         outstr=""
         for clust in self.clustered_calls:
-            start = clust.get_med_start()
-            end = clust.get_med_end()
+            start = clust.get_best_start()
+            end = clust.get_best_end()
             outstr+="%s\t%d\t%d\t%f\n"%(self.chr, start, end, clust.get_log_likelihood())
+        return outstr
+    
+    def get_indiv_calls_str(self):
+        
+        outstr=""
+        for clust in self.clustered_calls:
+            outstr+=clust.get_indiv_calls_str()
         return outstr
     
     def print_verbose(self):
@@ -340,7 +376,7 @@ class CNV_call:
                                               self.log_likelihood, 
                                               len(self.clustered_calls))
         for clust in self.clustered_calls:
-            print clust.chr, clust.get_med_start(), clust.get_med_end()
+            print clust.chr, clust.get_best_start(), clust.get_best_end()
             clust.print_out()
 
 

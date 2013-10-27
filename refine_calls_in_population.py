@@ -40,7 +40,7 @@ if __name__=="__main__":
     
     call_table = cluster.callset_table(o.fn_call_table) 
     
-    call_table.filter_by_gsize(max_callsize)
+    call_table.filter_by_gsize(o.max_callsize)
     call_table.filter(o.p_cutoff, o.min_wnds) 
     
     """

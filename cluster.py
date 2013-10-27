@@ -36,7 +36,7 @@ class callset_table:
                                      compression = 'gzip')
         print >>stderr, "done (%fs)"%(time.time()-t)
     
-    def filter_by_gzize(self, max_size):
+    def filter_by_gsize(self, max_size):
 
         print >>stderr, "filtering calls >%dbp"%(max_size)
         self.pd_table = self.pd_table[(self.pd_table['end']-self.pd_table['start'])<=max_size]

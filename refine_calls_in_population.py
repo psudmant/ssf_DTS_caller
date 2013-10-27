@@ -35,9 +35,14 @@ if __name__=="__main__":
     opts.add_option('', '--out_resolved', dest='fn_out_resolved')
     opts.add_option('', '--p_cutoff', dest='p_cutoff', type=float, default=0.005)
     opts.add_option('', '--min_wnd_call_size', dest='min_wnds', type=int, default=2)
+    opts.add_option('', '--max_callsize', dest='max_callsize', type=int, default=200000)
     (o, args) = opts .parse_args()
     
     call_table = cluster.callset_table(o.fn_call_table) 
+    print >>stderr, "filtering calls >%dbp"%(o.max_callsize)
+    call_table = call_table[(call_table['end']-call_table['start'])<o.max_callsize]
+    print >>stderr, "done"
+
     call_table.filter(o.p_cutoff, o.min_wnds) 
     
     """

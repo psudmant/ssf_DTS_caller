@@ -13,6 +13,7 @@ def output_calls(final_calls, fn):
     output ALL indivdiaul clusters making up calls
     """
     with open(fn, "w") as F:
+        F.write("%s\n"%("\t".join(["indiv_ref", "indiv_test", "chr", "start", "end", "mu",  "p", "window_size"])))
         for call in final_calls:
             F.write("%s"%call.print_str())
 

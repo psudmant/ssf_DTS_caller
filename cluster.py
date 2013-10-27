@@ -70,7 +70,10 @@ class cluster_calls:
         """
         self.callset_table = copy.deepcopy(callset_table)
         self.callset_table.sort()
+        print >> stderr, "getting overlapping elements..."
+        t=time.time()
         self.overlapping_calls_by_chr, self.n_overlapping = self.get_overlapping_calls()
+        print >>stderr, "done (%fs)"%(time.time()-t)
         print >>stderr, "%d overlapping calls"%self.n_overlapping
     
     def resolve_overlapping_clusters(self, verbose=False):
@@ -83,6 +86,7 @@ class cluster_calls:
         final_calls = []
         
         for chr, overlapping_calls in self.overlapping_calls_by_chr.iteritems():
+            print >>stderr, chr
             for overlap_cluster in overlapping_calls:
                 resolved_calls = overlap_cluster.resolve(0.85, ll_cutoff, min_size=2)
                 final_calls += resolved_calls
@@ -192,6 +196,72 @@ class call_cluster:
         self.all_starts.append(call['start'])
         self.all_ends.append(call['end'])
         self.size+=1
+    
+    def over_simplify(self):
+        print >>stderr, "over-simplifying..."
+        curr_call=[]
+        new_calls = []
+        new_all_starts = []
+        new_all_ends = []
+        curr_ends = [] 
+        for call in self.calls:
+            if len(curr_call)==0:
+                curr_call=call
+                new_calls.append(curr_call)
+                new_all_starts.append(curr_call['start'])
+                curr_ends = [curr_call['end']]
+                continue
+            if call['start'] == curr_call['start']:
+                curr_call['p'] = 10**(np.log(curr_call['p'])+np.log(call['p'])) 
+                curr_ends.append(curr_call['end'])
+            else:
+                end = int(np.median(np.array(curr_ends)))
+                curr_call['end'] = end
+                new_all_ends.append(curr_call['end'])
+                
+                curr_call=call
+                new_calls.append(curr_call)
+                new_all_starts.append(curr_call['start'])
+                curr_ends = [curr_call['end']]
+        
+        self.calls=new_calls
+        self.size=len(new_calls)
+        self.all_starts = new_all_starts
+        self.all_ends = new_all_ends
+
+
+
+
+
+
+    def simplify(self):
+
+        curr_call=[]
+        new_calls = []
+        new_all_starts = []
+        new_all_ends = []
+        
+        for call in self.calls:
+            if len(curr_call)==0:
+                curr_call=call
+                new_calls.append(curr_call)
+                new_all_starts.append(curr_call['start'])
+                new_all_ends.append(curr_call['end'])
+                continue
+            if call['start'] == curr_call['start'] and call['end'] == curr_call['end']:
+                curr_call['p'] = 10**(np.log(curr_call['p'])+np.log(call['p'])) 
+            else:
+                curr_call=call
+                new_calls.append(curr_call)
+                new_all_starts.append(curr_call['start'])
+                new_all_ends.append(curr_call['end'])
+        
+        self.calls=new_calls
+        self.size=len(new_calls)
+        self.all_starts = new_all_starts
+        self.all_ends = new_all_ends
+
+
     def get_indiv_calls_str(self):
         ret_str = ""
         for call in self.calls:
@@ -203,6 +273,23 @@ class call_cluster:
                                                call["mu"],
                                                call["p"], 
                                                call["window_size"]]]))
+        return ret_str
+    
+    def get_call_str(self):
+        ret_str = ""
+        call = self.calls[0]
+        
+        size = np.median(np.array([ c['window_size'] for c in self.calls]))
+        mu = np.median(np.array([ c['mu'] for c in self.calls]))
+        
+        ret_str="\t".join([ str(s) for s in  [ call["indiv_ref"], 
+                                               call["indiv_test"], 
+                                               call["chr"],
+                                               self.get_best_start(), 
+                                               self.get_best_end(), 
+                                               mu,
+                                               10.0**self.get_log_likelihood(),
+                                               size ]])
         return ret_str
             
     #def get_start(self):
@@ -286,12 +373,14 @@ class call_cluster:
         
     def cluster_by_recip_overlap(self, cutoff, ll_cutoff=0, plot=False):
 
+        #t = time.time()
         mat = np.zeros((self.size,self.size))
+
         for i in xrange(self.size):
             for j in xrange(self.size):
                 #mat[i,j] = 1-((self.frac_overlap(i,j)+self.frac_overlap(j,i))/2.0)
                 mat[i,j] = 1-(self.frac_overlap(i,j))
-
+        #print time.time()-t
         
         mat=1.-dist.squareform( (1-mat) * (np.diag(np.repeat(1,self.size),0) -1) * -1)
         Z = hclust.linkage(mat, method='complete')
@@ -320,6 +409,12 @@ class call_cluster:
             return []
 
         #single event (in the event that we ARE allowing them, by default, not (see above catch)     
+        if self.size>1000: 
+            self.over_simplify()
+        else:
+            self.simplify()
+        #self.print_out()
+        #print self.size
         if self.size == 1:
             return self.get_log_likelihood < ll_cutoff and [CNV_call([self],self.chr)] or []
                                                            
@@ -363,9 +458,7 @@ class CNV_call:
         
         outstr=""
         for clust in self.clustered_calls:
-            start = clust.get_best_start()
-            end = clust.get_best_end()
-            outstr+="%s\t%d\t%d\t%f\n"%(self.chr, start, end, clust.get_log_likelihood())
+            outstr+="%s\n"%(clust.get_call_str())
         return outstr
     
     def get_indiv_calls_str(self):

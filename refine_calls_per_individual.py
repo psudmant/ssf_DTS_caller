@@ -9,10 +9,23 @@ import cluster
 
 
 def output_calls(final_calls, fn):
-    
+    """
+    output ALL indivdiaul clusters making up calls
+    """
     with open(fn, "w") as F:
         for call in final_calls:
             F.write("%s"%call.print_str())
+
+def output_indiv_clust_elements(final_calls, fn):
+    """
+    output ALL indivdiaul calls
+    inside clusters to be combined at a later
+    date
+    """
+    with open(fn, "w") as F:
+        F.write("%s\n"%("\t".join(["indiv_ref", "indiv_test", "chr", "start", "end", "mu",  "p", "window_size"])))
+        for call in final_calls:
+            F.write("%s"%call.get_indiv_calls_str())
 
 if __name__=="__main__":
     
@@ -36,7 +49,8 @@ if __name__=="__main__":
     call_clusterer = cluster.cluster_calls(call_table)
     #call_clusterer.output_overlap_clusters(o.fn_out_indiv_calls_bed, name)
     final_calls = call_clusterer.resolve_overlapping_clusters(verbose=False)
-    output_calls(final_calls, o.fn_out_resolved)
+    output_indiv_clust_elements(final_calls, o.fn_out_resolved)
+    #output_calls(final_calls, o.fn_out_resolved)
     
 
      

@@ -14,6 +14,7 @@ import matplotlib.mlab as mlab
 ##local repo
 from sklearn import cluster 
 from sklearn import metrics
+from sklearn import mixture
 
 
 from sets import Set
@@ -119,32 +120,51 @@ class genotyper:
 
         print >>stderr, "done (%fs)"%(time.time()-t)
        
-    
-    def plot(self, X, Xs, chr, start, end):
+    def addGMM(self, gmm, ax, X):
+        
+        G_x=np.arange(0,max(X)+1,.1)
+        l = gmm.means.shape[0] 
+        print l
+        for i in xrange(l):
+            c=cm.hsv(float(i)/l,1)
+            mu = gmm.means[i,0]
+            var = gmm.covars[i][0][0]
+            print mu, var
+
+            G_y = mlab.normpdf(G_x, mu, var**.5)*gmm.weights[i]
+            ax.plot(G_x,G_y,color=c)
+            ax.plot(mu,-.001,"^",ms=10,alpha=.7,color=c)
+            
+    def plot(self, X, Xs, gmmX, gmmXs, chr, start, end):
         
         cps = np.mean(X, 1)
         sunk_cps = np.mean(Xs, 1)
         
         plt.rc('grid',color='0.75',linestyle='l',linewidth='0.1')
-        fig = plt.figure()
-        fig.set_figwidth(8)
-        fig.set_figheight(6)
+        fig, axarr = plt.subplots(2, 2)
+        fig.set_figwidth(11)
+        fig.set_figheight(8.5)
         axescolor  = '#f6f6f6'
-        h_margin = 0.05
-        v_margin = 0.05
+        #h_margin = 0.05
+        #v_margin = 0.05
+        #plot_height=1-2*v_margin
+        #plot_width=((1-2*h_margin)-2*h_margin)/3.0
+        #bottom=1-h_margin-plot_height
+        #plot_rects = []
+        #plot_rect=[h_margin,bottom,plot_width,plot_height]
+        #ax = fig.add_axes(plot_rect)
+        #
+        #ax.plot(cps, sunk_cps, 'ro', alpha=0.5)
+
         
-        plot_height=1-2*v_margin
-        plot_width=(1-2*h_margin)
+        axarr[0,0].plot(cps, sunk_cps, 'ro', alpha=0.5)
+        axarr[0,0].set_xlim(0,max(cps)+1)
+        axarr[0,0].set_ylim(0,max(sunk_cps)+1)
         
-        bottom=1-h_margin-plot_height
-        plot_rect=[h_margin,bottom,plot_width,plot_height]
-        
-        ax = fig.add_axes(plot_rect)
-        
-        ax.plot(cps, sunk_cps, 'ro', alpha=0.5)
-        
-        ax.set_xlim(0,max(cps)+1)
-        ax.set_ylim(0,max(sunk_cps)+1)
+        n, bins, patches = axarr[0,1].hist(cps,alpha=.9,ec='none',normed=1,bins=len(cps)/20)
+        self.addGMM(gmmX, axarr[0,1], cps)
+        n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,bins=len(cps)/20)
+        self.addGMM(gmmXs, axarr[1,0], sunk_cps)
         
         fig.savefig("%s/%s-%d-%d.png"%(self.plot_dir, chr, start, end))
         plt.close()
@@ -223,6 +243,48 @@ class genotyper:
 
     def s_score(self, X, labels):
         return metrics.silhouette_score(X, labels) 
+
+    def GMM_genotype(self, X):
+        """
+        GMM genotyping
+        #cv_types = ['spherical', 'tied', 'diag', 'full']
+        """
+        mus = np.mean(X,1)
+        mus = np.reshape(mus, (mus.shape[0],1))
+        
+        min_mu, max_mu = int(np.amin(mus)), int(np.amax(mus))
+
+        n_components = max_mu - min_mu + 1 
+        init_mus = np.arange(min_mu, max_mu+1)
+        init_mus = np.reshape(init_mus, (n_components,1))
+        
+        gmm = mixture.VBGMM(n_components, 'spherical')
+        gmm.means = init_mus
+        gmm.fit(mus, init_params='wc')
+        
+        labels = gmm.predict(mus)
+        posteriors = gmm.predict_proba(mus) 
+        log_prob = gmm.score(mus)
+         
+        #print "done fit"
+        #print gmm.weights
+        #print gmm.means
+        #print gmm.covars
+        #print labels
+        #print posteriors
+         
+        #self.s_score(X, labels)
+        print >>stderr, "converged:", gmm.converged_
+        print >>stderr, "means:", gmm.means
+        print >>stderr, "weights:", gmm.weights
+        #print >>stderr, "log prop:", log_prob
+        print >>stderr, "lower_bound:", gmm.lower_bound(mus, gmm.labels)
+
+        return gmm, labels, posteriors, -1,
+
+        
+
+
 
     def ms_genotype(self, X):
         """

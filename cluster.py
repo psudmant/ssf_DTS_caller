@@ -230,10 +230,6 @@ class call_cluster:
         self.all_ends = new_all_ends
 
 
-
-
-
-
     def simplify(self):
 
         curr_call=[]

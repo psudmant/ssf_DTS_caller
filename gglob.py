@@ -27,16 +27,29 @@ class gglob:
         self.wnd_size = idx_data['wnd_size'] 
         self.wnd_slide = idx_data['wnd_slide'] 
         self.contig = contig
+       
+        self.wnd_starts = np.load("%s/%s.wnd_starts.npy"%(o.gglob_dir, contig))
+        self.wnd_wnds = np.load("%s/%s.wnd_ends.npy"%(o.gglob_dir, contig))
+        self.cp_matrix = np.load("%s/%s.cp_matrix.npy"%(o.gglob_dir, contig))
         
-        npz = np.load("%s/%s.npz"%(gglob_dir, contig))
-        print npz.files
+        self.sunk_wnd_starts = np.load("%s/%s.sunk_wnd_starts.npy"%(o.gglob_dir, contig))
+        self.sunk_wnd_wnds = np.load("%s/%s.sunk_wnd_ends.npy"%(o.gglob_dir, contig))
+        self.sunk_cp_matrix = np.load("%s/%s.sunk_cp_matrix.npy"%(o.gglob_dir, contig))
+        
+        #print "%s/%s.npz"%(gglob_dir, contig)
+        #npz = np.load("%s/%s.npz"%(gglob_dir, contig))
+        #print npz.files
+        #print npz['wnd_starts'] 
+        #print npz['wnd_ends'] 
+        #print npz['cp_matrix'] 
 
-        self.wnd_starts = npz['wnd_starts']
-        self.wnd_ends = npz['wnd_ends']
-        self.cp_matrix = npz['cp_matrix']
-        self.sunk_wnd_starts = npz['sunk_wnd_starts']
-        self.sunk_wnd_ends = npz['sunk_wnd_ends']
-        self.sunk_cp_matrix = npz['sunk_cp_matrix']
+        #self.wnd_starts = npz['wnd_starts']
+        #self.wnd_ends = npz['wnd_ends']
+        #self.cp_matrix = npz['cp_matrix']
+        #
+        #self.sunk_wnd_starts = npz['sunk_wnd_starts']
+        #self.sunk_wnd_ends = npz['sunk_wnd_ends']
+        #self.sunk_cp_matrix = npz['sunk_cp_matrix']
 
         assert self.sunk_cp_matrix.shape[0] == len(self.indivs) 
             
@@ -123,12 +136,21 @@ if __name__=="__main__":
             
             sunk_cp_matrix[i,:] = sunk_wnd_cp.get_cps_by_chr(contig, correct=correct) 
         
-        np.savez_compressed("%s/%s"%(o.gglob_dir, contig), wnd_starts=wnd_starts,
-                                                           wnd_ends=wnd_ends, 
-                                                           cp_matrix=cp_matrix,
-                                                           sunk_wnd_starts=sunk_wnd_starts,
-                                                           sunk_wnd_ends=sunk_wnd_ends,
-                                                           sunk_cp_matrix=sunk_cp_matrix)
+        np.save("%s/%s.wnd_starts"%(o.gglob_dir, contig), wnd_starts)
+        np.save("%s/%s.wnd_ends"%(o.gglob_dir, contig), wnd_ends)
+        np.save("%s/%s.cp_matrix"%(o.gglob_dir, contig), cp_matrix)
+        
+        np.save("%s/%s.sunk_wnd_starts"%(o.gglob_dir, contig), sunk_wnd_starts)
+        np.save("%s/%s.sunk_wnd_ends"%(o.gglob_dir, contig), sunk_wnd_ends)
+        np.save("%s/%s.sunk_cp_matrix"%(o.gglob_dir, contig), sunk_cp_matrix)
+        
+
+        #np.savez_compressed("%s/%s"%(o.gglob_dir, contig), wnd_starts=wnd_starts,
+        #                                                   wnd_ends=wnd_ends, 
+        #                                                   cp_matrix=cp_matrix,
+        #                                                   sunk_wnd_starts=sunk_wnd_starts,
+        #                                                   sunk_wnd_ends=sunk_wnd_ends,
+        #                                                   sunk_cp_matrix=sunk_cp_matrix)
         print >>stderr, "done (%f)"%(time.time()-t)
 
 

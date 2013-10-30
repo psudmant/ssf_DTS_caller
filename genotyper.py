@@ -55,8 +55,10 @@ class genotype_table:
                                 "\t".join([str(l) for l in call.labels])))
 
 class genotyper:
+    
+    def init_on_indiv_DTS_files(self, args):
 
-    def __init__(self, 
+    def __init__(self, contig, **kwargs): 
                  dts_dir, 
                  sunk_dts_dir, 
                  fn_contigs, 

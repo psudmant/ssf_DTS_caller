@@ -2,7 +2,6 @@ import glob
 from sys import stderr
 import numpy as np
 
-from wnd_cp_data import wnd_cp_indiv
 
 import time
 import matplotlib.pyplot as plt
@@ -22,6 +21,9 @@ from sets import Set
 import math
 import random
 from scipy.stats import norm
+
+from wnd_cp_data import wnd_cp_indiv
+from gglob import gglob
 
 class call:
 
@@ -56,42 +58,15 @@ class genotype_table:
 
 class genotyper:
     
-    def init_on_indiv_DTS_files(self, args):
-
-    def __init__(self, contig, **kwargs): 
-                 dts_dir, 
-                 sunk_dts_dir, 
-                 fn_contigs, 
-                 fn_sunk_contigs, 
-                 wnd_size,
-                 contig,
-                 plot_dir,
-                 F_fnToIndiv=lambda x: x.split("/")[-1].replace("500_bp_",""),
-                 limit_to_n=None):
+    def init_on_indiv_DTS_files(self, **kwargs):
+        self.dts_dir = kwargs.get(dts_dir, None) 
+        self.sunk_dts_dir = kwargs.get(sunk_dts_dir, None) 
+        self.fn_contigs  = kwargs.get(fn_contigs, None) 
+        self.fn_sunk_contigs  = kwargs.get(fn_sunk_contigs, None) 
+        self.wnd_size  = kwargs.get(wnd_size, None) 
+        self.F_fnToIndiv = kwargs.get(F_fnToIndiv, lambda x: x.split("/")[-1].replace("500_bp_","")
         
         self.i_by_indiv = {}
-        self.indivs = []
-        self.wnd_starts = None
-        self.wnd_ends = None
-        self.sunk_wnd_starts = None
-        self.sunk_wnd_ends = None
-        
-        self.cp_matrix = None
-        self.sunk_cp_matrix = None
-        
-        self.has_sunk_cps = False
-        
-        if fn_sunk_contigs != None:
-            self.has_sunk_cps = True
-
-        self.contig = contig
-        self.plot_dir = plot_dir
-        
-        DTS_prefix="500_bp_" 
-
-        print >>stderr, "loading genomes..."
-        t = time.time()
-        
         fn_DTSs = glob.glob("%s/%s*"%(dts_dir, DTS_prefix))
         
         n_indivs = limit_to_n and limit_to_n or len(fn_DTSs)
@@ -130,6 +105,44 @@ class genotyper:
             self.cp_matrix = np.load("./tmp_cp_matrix.npy") 
             self.sunk_cp_matrix = np.load("./tmp_sunk_cp_matrix.npy") 
 
+    
+    def init_on_gglob(self, contig, fn_gglob):
+        
+        g = gglob(contig, fn_gglob)
+        
+        self.indivs = g.indivs
+        self.wnd_starts = g.wnd_starts
+        self.wnd_ends = g.wnd_ends
+        self.sunk_wnd_starts = g.sunk_wnd_starts
+        self.sunk_wnd_ends = g.sunk_wnd_ends
+        
+        self.cp_matrix = g.cp_matrix
+        self.sunk_cp_matrix = g.sunk_cp_matrix
+        
+
+    def __init__(self, contig, **kwargs): 
+
+        self.gglob_dir = kwargs.get(gglob_dir, None) 
+        self.plot_dir  = kwargs.get(plot_dir, None)
+        
+        self.contig = contig
+        self.indivs = []
+        self.wnd_starts = None
+        self.wnd_ends = None
+        self.sunk_wnd_starts = None
+        self.sunk_wnd_ends = None
+        
+        self.cp_matrix = None
+        self.sunk_cp_matrix = None
+        
+        if self.gglob_dir:
+            self.init_on_gglob(self.contig, self.gglob_dir) 
+        else:
+            self.init_on_indiv_DTS_files(self, **kwargs)
+
+        print >>stderr, "loading genomes..."
+        t = time.time()
+        
         print >>stderr, "done (%fs)"%(time.time()-t)
        
     def addGMM(self, gmm, ax, X):

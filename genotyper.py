@@ -19,6 +19,10 @@ from sklearn import mixture
 
 from sets import Set
 
+import math
+import random
+from scipy.stats import norm
+
 class call:
 
     def __init__(self, chr, start, end, X, labels, s):
@@ -100,23 +104,29 @@ class genotyper:
             self.sunk_wnd_starts, self.sunk_wnd_ends = rand_sunk_wnd_cp.get_wnds_by_chr(contig)
             self.sunk_cp_matrix = np.zeros((n_indivs, self.sunk_wnd_starts.shape[0]))
 
-        for i, fn_DTS in enumerate(fn_DTSs):
-            if limit_to_n and i>=limit_to_n: break
+        if 0:
+            for i, fn_DTS in enumerate(fn_DTSs):
+                if limit_to_n and i>=limit_to_n: break
 
-            indiv = F_fnToIndiv(fn_DTS)
-            wnd_cp = wnd_cp_indiv(fn_DTS,
-                                  fn_contigs,
-                                  wnd_size)
-            
-            self.indivs.append(indiv)
-            self.cp_matrix[i,:] = wnd_cp.get_cps_by_chr(contig,correct=True) 
-
-            if self.has_sunk_cps:
-                wnd_cp = wnd_cp_indiv("%s/%s%s"%(sunk_dts_dir, DTS_prefix, indiv),
-                                      fn_sunk_contigs,
+                indiv = F_fnToIndiv(fn_DTS)
+                wnd_cp = wnd_cp_indiv(fn_DTS,
+                                      fn_contigs,
                                       wnd_size)
-                self.sunk_cp_matrix[i,:] = wnd_cp.get_cps_by_chr(contig, correct=True) 
-                                                                     
+                
+                self.indivs.append(indiv)
+                self.cp_matrix[i,:] = wnd_cp.get_cps_by_chr(contig,correct=True) 
+
+                if self.has_sunk_cps:
+                    wnd_cp = wnd_cp_indiv("%s/%s%s"%(sunk_dts_dir, DTS_prefix, indiv),
+                                          fn_sunk_contigs,
+                                          wnd_size)
+                    self.sunk_cp_matrix[i,:] = wnd_cp.get_cps_by_chr(contig, correct=True) 
+                                                                         
+            np.save("./tmp_cp_matrix", self.cp_matrix)
+            np.save("./tmp_sunk_cp_matrix", self.sunk_cp_matrix)
+        else:
+            self.cp_matrix = np.load("./tmp_cp_matrix.npy") 
+            self.sunk_cp_matrix = np.load("./tmp_sunk_cp_matrix.npy") 
 
         print >>stderr, "done (%fs)"%(time.time()-t)
        
@@ -126,7 +136,7 @@ class genotyper:
         l = gmm.means.shape[0] 
         print l
         for i in xrange(l):
-            c=cm.hsv(float(i)/l,1)
+            c = cm.hsv(float(i)/l,1)
             mu = gmm.means[i,0]
             var = gmm.covars[i][0][0]
             print mu, var
@@ -135,7 +145,7 @@ class genotyper:
             ax.plot(G_x,G_y,color=c)
             ax.plot(mu,-.001,"^",ms=10,alpha=.7,color=c)
             
-    def plot(self, X, Xs, gmmX, gmmXs, chr, start, end):
+    def plot(self, X, Xs, gmmX, gmmXs, v_bndsX, v_bndsXs, chr, start, end):
         
         cps = np.mean(X, 1)
         sunk_cps = np.mean(Xs, 1)
@@ -155,16 +165,17 @@ class genotyper:
         #ax = fig.add_axes(plot_rect)
         #
         #ax.plot(cps, sunk_cps, 'ro', alpha=0.5)
-
         
-        axarr[0,0].plot(cps, sunk_cps, 'ro', alpha=0.5)
-        axarr[0,0].set_xlim(0,max(cps)+1)
-        axarr[0,0].set_ylim(0,max(sunk_cps)+1)
+        axarr[0,0].plot(cps, sunk_cps, 'ro', alpha=0.2)
+        axarr[0,0].set_xlim(-0.10,max(cps)+1)
+        axarr[0,0].set_ylim(-0.10,max(sunk_cps)+1)
         
-        n, bins, patches = axarr[0,1].hist(cps,alpha=.9,ec='none',normed=1,bins=len(cps)/20)
+        n, bins, patches = axarr[0,1].hist(cps,alpha=.9,ec='none',normed=1,color='r',bins=len(cps)/20)
         self.addGMM(gmmX, axarr[0,1], cps)
-        n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,bins=len(cps)/20)
+        n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,color='g',bins=len(cps)/20)
         self.addGMM(gmmXs, axarr[1,0], sunk_cps)
+        axarr[1,1].plot(v_bndsX[0], v_bndsX[1], 'ro-')
+        axarr[1,1].plot(v_bndsXs[0], v_bndsXs[1], 'go-')
         
         fig.savefig("%s/%s-%d-%d.png"%(self.plot_dir, chr, start, end))
         plt.close()
@@ -243,6 +254,21 @@ class genotyper:
 
     def s_score(self, X, labels):
         return metrics.silhouette_score(X, labels) 
+    
+
+    def fit_GMM(self, X, init_means, init_weights):
+    
+        n_components = len(init_means)
+        gmm = mixture.GMM(n_components, 'spherical')
+        gmm.means = np.reshape(np.array(init_means),(len(init_means),1))
+        gmm.weights = np.array(init_weights)
+        gmm.fit(X, n_iter=1000, init_params='c')
+        labels = gmm.predict(X)
+        
+        bic = -2*gmm.score(X).sum() + (3*n_components)*np.log(X.shape[0])
+        aic = -2*gmm.score(X).sum() + 2*(3*n_components)
+        
+        return gmm, labels, bic 
 
     def GMM_genotype(self, X):
         """
@@ -250,41 +276,44 @@ class genotyper:
         #cv_types = ['spherical', 'tied', 'diag', 'full']
         """
         mus = np.mean(X,1)
+        #mus = np.median(X,1)
         mus = np.reshape(mus, (mus.shape[0],1))
         
-        min_mu, max_mu = int(np.amin(mus)), int(np.amax(mus))
-
-        n_components = max_mu - min_mu + 1 
-        init_mus = np.arange(min_mu, max_mu+1)
-        init_mus = np.reshape(init_mus, (n_components,1))
+        round_mus = np.around(mus) 
+        init_mus = list(np.unique(round_mus))
         
-        gmm = mixture.VBGMM(n_components, 'spherical')
-        gmm.means = init_mus
-        gmm.fit(mus, init_params='wc')
+        init_weights = []
+        for comp in init_mus:
+            init_weights.append(float(np.sum(round_mus==comp))/len(round_mus))
         
-        labels = gmm.predict(mus)
-        posteriors = gmm.predict_proba(mus) 
-        log_prob = gmm.score(mus)
-         
-        #print "done fit"
-        #print gmm.weights
-        #print gmm.means
-        #print gmm.covars
-        #print labels
-        #print posteriors
-         
-        #self.s_score(X, labels)
-        print >>stderr, "converged:", gmm.converged_
-        print >>stderr, "means:", gmm.means
-        print >>stderr, "weights:", gmm.weights
-        #print >>stderr, "log prop:", log_prob
-        print >>stderr, "lower_bound:", gmm.lower_bound(mus, gmm.labels)
-
-        return gmm, labels, posteriors, -1,
-
+        gmm, labels, ic = self.fit_GMM(mus, init_mus, init_weights)
         
-
-
+        print self.pw_GMM_overlap(gmm)
+        return gmm, labels, [[len(init_mus)], [ic]]
+    
+    def pw_GMM_overlap(self, gmm):
+        
+        overlaps = []       
+        mus = gmm.means[:,0]
+        vars = np.array([v[0][0] for v in gmm.covars])
+        order = np.argsort(mus)
+        mus = mus[order]
+        vars = vars[order]
+        
+        for i in xrange(mus.shape[0]-1):
+            mu1 = mus[i]
+            mu2 = mus[i+1]
+            v1 = vars[i]
+            v2 = vars[i+1]
+            sd_max = np.sqrt(max(v1, v2))
+            mn = min(mu1, mu2) - 10*sd_max
+            mx = max(mu1, mu2) + 10*sd_max
+            xs = np.arange(mn,mx,0.01)
+            o = np.sum(np.min(np.c_[norm.pdf(xs,loc=mu1,scale=v1), 
+                                    norm.pdf(xs,loc=mu2,scale=v2)], 1))  * 0.01
+            print mn, mx, mu1, mu2, v1, v2, o
+            overlaps.append(o)
+        return overlaps
 
     def ms_genotype(self, X):
         """

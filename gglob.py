@@ -7,6 +7,7 @@ import os
 from wnd_cp_data import wnd_cp_indiv
 import time
 import numpy as np
+import pandas as pd
 
 class gglob:
     """
@@ -28,29 +29,25 @@ class gglob:
         self.wnd_slide = idx_data['wnd_slide'] 
         self.contig = contig
        
-        self.wnd_starts = np.load("%s/%s.wnd_starts.npy"%(o.gglob_dir, contig))
-        self.wnd_wnds = np.load("%s/%s.wnd_ends.npy"%(o.gglob_dir, contig))
-        self.cp_matrix = np.load("%s/%s.cp_matrix.npy"%(o.gglob_dir, contig))
-        
-        self.sunk_wnd_starts = np.load("%s/%s.sunk_wnd_starts.npy"%(o.gglob_dir, contig))
-        self.sunk_wnd_wnds = np.load("%s/%s.sunk_wnd_ends.npy"%(o.gglob_dir, contig))
-        self.sunk_cp_matrix = np.load("%s/%s.sunk_cp_matrix.npy"%(o.gglob_dir, contig))
-        
-        #print "%s/%s.npz"%(gglob_dir, contig)
-        #npz = np.load("%s/%s.npz"%(gglob_dir, contig))
-        #print npz.files
-        #print npz['wnd_starts'] 
-        #print npz['wnd_ends'] 
-        #print npz['cp_matrix'] 
+        keys = ["wnd_starts","wnd_ends","cp_matrix","sunk_wnd_starts","sunk_wnd_ends","sunk_cp_matrix"]
+        fn_in = "%s/%s"%(gglob_dir,contig)
 
-        #self.wnd_starts = npz['wnd_starts']
-        #self.wnd_ends = npz['wnd_ends']
-        #self.cp_matrix = npz['cp_matrix']
-        #
-        #self.sunk_wnd_starts = npz['sunk_wnd_starts']
-        #self.sunk_wnd_ends = npz['sunk_wnd_ends']
-        #self.sunk_cp_matrix = npz['sunk_cp_matrix']
+        mats_by_key = {} 
+        for k in keys:
+            print >>stderr, "loading %s..."%k
+            t=time.time()
+            df = pd.read_hdf("%s.%s.h5"%(fn_in,k),k)
+            mats_by_key[k] = df.as_matrix()
+            print >>stderr, "done (%fs)"%(time.time()-t)
 
+        self.wnd_starts = mats_by_key['wnd_starts'][:,0]
+        self.wnd_ends = mats_by_key['wnd_ends'][:,0]
+        self.cp_matrix = mats_by_key['cp_matrix']
+        
+        self.sunk_wnd_starts = mats_by_key['sunk_wnd_starts'][:,0]
+        self.sunk_wnd_ends = mats_by_key['sunk_wnd_ends'][:,0]
+        self.sunk_cp_matrix = mats_by_key['sunk_cp_matrix']
+        
         assert self.sunk_cp_matrix.shape[0] == len(self.indivs) 
             
 if __name__=="__main__":
@@ -123,7 +120,6 @@ if __name__=="__main__":
         correct = not (contig in ["chrY", "chrX"])
 
         for i, indiv in enumerate(indivs):
-            
             wnd_cp = wnd_cp_indiv("%s%s"%(DTS_pre, indiv),
                                   o.fn_contigs,
                                   wnd_size)
@@ -136,13 +132,32 @@ if __name__=="__main__":
             
             sunk_cp_matrix[i,:] = sunk_wnd_cp.get_cps_by_chr(contig, correct=correct) 
         
-        np.save("%s/%s.wnd_starts"%(o.gglob_dir, contig), wnd_starts)
-        np.save("%s/%s.wnd_ends"%(o.gglob_dir, contig), wnd_ends)
-        np.save("%s/%s.cp_matrix"%(o.gglob_dir, contig), cp_matrix)
+        fn_out =  "%s/%s"%(o.gglob_dir, contig)
         
-        np.save("%s/%s.sunk_wnd_starts"%(o.gglob_dir, contig), sunk_wnd_starts)
-        np.save("%s/%s.sunk_wnd_ends"%(o.gglob_dir, contig), sunk_wnd_ends)
-        np.save("%s/%s.sunk_cp_matrix"%(o.gglob_dir, contig), sunk_cp_matrix)
+        mats = {"wnd_starts":wnd_starts,
+                "wnd_ends":wnd_ends,
+                "cp_matrix":cp_matrix,
+                "sunk_wnd_starts":wnd_starts,
+                "sunk_wnd_ends":wnd_ends,
+                "sunk_cp_matrix":cp_matrix
+                }
+         
+        for k, mat in mats.iteritems():
+            print >>stderr, "writing out %s..."%k
+            t=time.time()
+            df = pd.DataFrame(mat)
+            df.to_hdf("%s.%s.h5"%(fn_out,k),k,complevel=1,complib='zlib')
+            #df.to_hdf("%s.%s.h5"%(fn_out,k),k,complevel=5,complib='lzo')
+            #df.to_hdf("%s.%s.h5"%(fn_out,k),k)
+            print >>stderr, "done (%fs)"%(time.time()-t)
+        
+        #np.save("%s/%s.wnd_starts"%(o.gglob_dir, contig), wnd_starts)
+        #np.save("%s/%s.wnd_ends"%(o.gglob_dir, contig), wnd_ends)
+        #np.save("%s/%s.cp_matrix"%(o.gglob_dir, contig), cp_matrix)
+        #
+        #np.save("%s/%s.sunk_wnd_starts"%(o.gglob_dir, contig), sunk_wnd_starts)
+        #np.save("%s/%s.sunk_wnd_ends"%(o.gglob_dir, contig), sunk_wnd_ends)
+        #np.save("%s/%s.sunk_cp_matrix"%(o.gglob_dir, contig), sunk_cp_matrix)
         
 
         #np.savez_compressed("%s/%s"%(o.gglob_dir, contig), wnd_starts=wnd_starts,

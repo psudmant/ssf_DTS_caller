@@ -34,11 +34,12 @@ class gglob:
 
         mats_by_key = {} 
         for k in keys:
-            print >>stderr, "loading %s..."%k
+            stderr.write("loading %s..."%k)
+            stderr.flush()
             t=time.time()
             df = pd.read_hdf("%s.%s.h5"%(fn_in,k),k)
             mats_by_key[k] = df.as_matrix()
-            print >>stderr, "done (%fs)"%(time.time()-t)
+            stderr.write("done (%fs)\n"%(time.time()-t))
 
         self.wnd_starts = mats_by_key['wnd_starts'][:,0]
         self.wnd_ends = mats_by_key['wnd_ends'][:,0]

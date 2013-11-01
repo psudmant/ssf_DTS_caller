@@ -138,9 +138,9 @@ if __name__=="__main__":
         mats = {"wnd_starts":wnd_starts,
                 "wnd_ends":wnd_ends,
                 "cp_matrix":cp_matrix,
-                "sunk_wnd_starts":wnd_starts,
-                "sunk_wnd_ends":wnd_ends,
-                "sunk_cp_matrix":cp_matrix
+                "sunk_wnd_starts":sunk_wnd_starts,
+                "sunk_wnd_ends":sunk_wnd_ends,
+                "sunk_cp_matrix":sunk_cp_matrix
                 }
          
         for k, mat in mats.iteritems():

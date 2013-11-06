@@ -15,19 +15,97 @@ class gglob:
     windowed genome data. A gglob_dir has 2 components:
     1. gglob.index
     2. chr{*}.npz for all chrs 
+
+    TODO:
+    add 2 classmethods
+    1. basic, load_from_gglob
+    2. load_from_DTS (basically just runs the code in the init)
     """
+    
+    @classmethod
+    def init_from_DTS(cls, **kwargs):
+        """
+        requires the below inputs
+
+        gglob.init_from_DTS(DTS_dir = DTS_dir,
+                            DTS_prefix = DTS_prefix,
+                            sunk_DTS_dir = sunk_DTS_dir,
+                            sunk_DTS_prefix = sunk_DTS_prefix,
+                            wnd_size = wnd_size,
+                            indivs = indivs,
+                            contig = contig,
+                            fn_contigs = fn_contigs,
+                            fn_sunk_contigs = fn_sunk_contigs)
+
+        """
+
+        DTS_dir = kwargs["DTS_dir"]
+        DTS_prefix = kwargs["DTS_prefix"]
         
-    def __init__(self, gglob_dir, contig):
+        sunk_DTS_dir = kwargs["sunk_DTS_dir"]
+        sunk_DTS_prefix = kwargs["sunk_DTS_prefix"]
+        
+        wnd_size = kwargs['wnd_size']
+        indivs = kwargs['indivs']
+        contig = kwargs['contig']
+
+        fn_contigs = kwargs['fn_contigs']
+        fn_sunk_contigs = kwargs['fn_sunk_contigs']
+
+
+        DTS_pre="%s/%s"%(DTS_dir, DTS_prefix) 
+        sunk_DTS_pre="%s/%s"%(sunk_DTS_dir, DTS_prefix) 
+        
+        n_indivs = len(indivs)
+        
+        t = time.time()
+        rand_wnd_cp = wnd_cp_indiv("%s%s"%(DTS_pre, indivs[0]), fn_contigs, wnd_size)
+        wnd_starts, wnd_ends = rand_wnd_cp.get_wnds_by_chr(contig)
+        cp_matrix = np.zeros((n_indivs, wnd_starts.shape[0]))
+
+        rand_sunk_wnd_cp = wnd_cp_indiv("%s%s"%(sunk_DTS_pre, indivs[0]), fn_sunk_contigs, wnd_size)
+        sunk_wnd_starts, sunk_wnd_ends = rand_sunk_wnd_cp.get_wnds_by_chr(contig)
+        sunk_cp_matrix = np.zeros((n_indivs, sunk_wnd_starts.shape[0]))
+        
+        correct = not (contig in ["chrY", "chrX"])
+
+        for i, indiv in enumerate(indivs):
+            wnd_cp = wnd_cp_indiv("%s%s"%(DTS_pre, indiv),
+                                  fn_contigs,
+                                  wnd_size)
+            
+            cp_matrix[i,:] = wnd_cp.get_cps_by_chr(contig, correct=correct) 
+
+            sunk_wnd_cp = wnd_cp_indiv("%s%s"%(sunk_DTS_pre, indiv), 
+                                      fn_sunk_contigs,
+                                      wnd_size)
+            
+            sunk_cp_matrix[i,:] = sunk_wnd_cp.get_cps_by_chr(contig, correct=correct) 
+        
+        return cls(indivs = indivs,
+                   wnd_size = wnd_size,
+                   wnd_slide = wnd_slide,
+                   contig = contig,
+                   wnd_starts = wnd_starts,
+                   wnd_ends = wnd_ends, 
+                   cp_matrix = cp_matrix, 
+                   sunk_wnd_starts = sunk_wnd_starts,
+                   sunk_wnd_ends = sunk_wnd_ends,
+                   sunk_cp_matrix = sunk_cp_matrix)
+        
+    @classmethod
+    def init_from_gglob_dir(cls, gglob_dir, contig):
+        
         #open up the index
         idx_data = None
         
         with open("%s/gglob.idx"%gglob_dir) as F:
             idx_data = json.load(F)
         
-        self.indivs = idx_data['indivs'] 
-        self.wnd_size = idx_data['wnd_size'] 
-        self.wnd_slide = idx_data['wnd_slide'] 
-        self.contig = contig
+        indivs = idx_data['indivs'] 
+        wnd_size = idx_data['wnd_size'] 
+        wnd_slide = idx_data['wnd_slide'] 
+        contig = contig
        
         keys = ["wnd_starts","wnd_ends","cp_matrix","sunk_wnd_starts","sunk_wnd_ends","sunk_cp_matrix"]
         fn_in = "%s/%s"%(gglob_dir,contig)
@@ -41,16 +119,71 @@ class gglob:
             mats_by_key[k] = df.as_matrix()
             stderr.write("done (%fs)\n"%(time.time()-t))
 
-        self.wnd_starts = mats_by_key['wnd_starts'][:,0]
-        self.wnd_ends = mats_by_key['wnd_ends'][:,0]
-        self.cp_matrix = mats_by_key['cp_matrix']
+        wnd_starts = mats_by_key['wnd_starts'][:,0]
+        wnd_ends = mats_by_key['wnd_ends'][:,0]
+        cp_matrix = mats_by_key['cp_matrix']
         
-        self.sunk_wnd_starts = mats_by_key['sunk_wnd_starts'][:,0]
-        self.sunk_wnd_ends = mats_by_key['sunk_wnd_ends'][:,0]
-        self.sunk_cp_matrix = mats_by_key['sunk_cp_matrix']
+        sunk_wnd_starts = mats_by_key['sunk_wnd_starts'][:,0]
+        sunk_wnd_ends = mats_by_key['sunk_wnd_ends'][:,0]
+        sunk_cp_matrix = mats_by_key['sunk_cp_matrix']
+        
+        return cls(indivs = indivs,
+                   wnd_size = wnd_size,
+                   wnd_slide = wnd_slide,
+                   contig = contig,
+                   wnd_starts = wnd_starts,
+                   wnd_ends = wnd_ends, 
+                   cp_matrix = cp_matrix, 
+                   sunk_wnd_starts = sunk_wnd_starts,
+                   sunk_wnd_ends = sunk_wnd_ends,
+                   sunk_cp_matrix = sunk_cp_matrix)
+    
+    def __init__(self, **kwargs):
+        """
+        the from_gglob_dir or from_DTS classmethods shoudl be used
+        for constructors
+        """
+
+        self.indivs = kwargs['indivs'] 
+        self.wnd_size = kwargs['wnd_size'] 
+        self.wnd_slide = kwargs['wnd_slide'] 
+        self.contig = kwargs['contig']
+        
+        self.wnd_starts = kwargs['wnd_starts']
+        self.wnd_ends = kwargs['wnd_ends']
+        self.cp_matrix = kwargs['cp_matrix']
+        
+        self.sunk_wnd_starts = kwargs['sunk_wnd_starts']
+        self.sunk_wnd_ends = kwargs['sunk_wnd_ends']
+        self.sunk_cp_matrix = kwargs['sunk_cp_matrix']
         
         assert self.sunk_cp_matrix.shape[0] == len(self.indivs) 
-            
+        
+    def save(self, gglob_dir):
+        """
+        save contig to a gglob_dir
+        """
+        fn_out =  "%s/%s"%(gglob_dir, self.contig)
+
+        mats = {"wnd_starts":self.wnd_starts,
+                "wnd_ends":self.wnd_ends,
+                "cp_matrix":self.cp_matrix,
+                "sunk_wnd_starts":self.sunk_wnd_starts,
+                "sunk_wnd_ends":self.sunk_wnd_ends,
+                "sunk_cp_matrix":self.sunk_cp_matrix
+               }
+         
+        for k, mat in mats.iteritems():
+            print >>stderr, "writing out %s..."%k
+            t=time.time()
+            df = pd.DataFrame(mat)
+            df.to_hdf("%s.%s.h5"%(fn_out,k),k,complevel=1,complib='zlib')
+            print >>stderr, "done (%fs)"%(time.time()-t)
+        
+        print >>stderr, "done (%f)"%(time.time()-t)
+
+
+
 if __name__=="__main__":
         
     opts = OptionParser()
@@ -76,6 +209,15 @@ if __name__=="__main__":
 
 
     (o, args) = opts.parse_args()
+    """
+    USAGE:
+
+    first init (it makes an idx file w/ all indivs
+    THEN: run the main program
+
+    **NOTE, need to test the old 'build glob dir' again
+
+    """
 
     if o.init == False and o.setup_chr == None:
         opts.print_help()
@@ -109,64 +251,17 @@ if __name__=="__main__":
         n_indivs = len(indivs)
         contig = o.setup_chr
         
-        t = time.time()
-        rand_wnd_cp = wnd_cp_indiv("%s%s"%(DTS_pre, indivs[0]), o.fn_contigs, wnd_size)
-        wnd_starts, wnd_ends = rand_wnd_cp.get_wnds_by_chr(contig)
-        cp_matrix = np.zeros((n_indivs, wnd_starts.shape[0]))
-
-        rand_sunk_wnd_cp = wnd_cp_indiv("%s%s"%(sunk_DTS_pre, indivs[0]), o.fn_sunk_contigs, wnd_size)
-        sunk_wnd_starts, sunk_wnd_ends = rand_sunk_wnd_cp.get_wnds_by_chr(contig)
-        sunk_cp_matrix = np.zeros((n_indivs, sunk_wnd_starts.shape[0]))
+        g = gglob.init_from_DTS(DTS_dir = o.DTS_dir,
+                                DTS_prefix = o.DTS_prefix,
+                                sunk_DTS_dir = o.sunk_DTS_dir,
+                                sunk_DTS_prefix = o.sunk_DTS_prefix,
+                                wnd_size = wnd_size,
+                                indivs = indivs,
+                                contig = contig,
+                                fn_contigs = o.fn_contigs,
+                                fn_sunk_contigs = o.fn_sunk_contigs)
         
-        correct = not (contig in ["chrY", "chrX"])
-
-        for i, indiv in enumerate(indivs):
-            wnd_cp = wnd_cp_indiv("%s%s"%(DTS_pre, indiv),
-                                  o.fn_contigs,
-                                  wnd_size)
-            
-            cp_matrix[i,:] = wnd_cp.get_cps_by_chr(contig, correct=correct) 
-
-            sunk_wnd_cp = wnd_cp_indiv("%s%s"%(sunk_DTS_pre, indiv), 
-                                      o.fn_sunk_contigs,
-                                      wnd_size)
-            
-            sunk_cp_matrix[i,:] = sunk_wnd_cp.get_cps_by_chr(contig, correct=correct) 
+        g.save(o.gglob_dir)
         
-        fn_out =  "%s/%s"%(o.gglob_dir, contig)
-        
-        mats = {"wnd_starts":wnd_starts,
-                "wnd_ends":wnd_ends,
-                "cp_matrix":cp_matrix,
-                "sunk_wnd_starts":sunk_wnd_starts,
-                "sunk_wnd_ends":sunk_wnd_ends,
-                "sunk_cp_matrix":sunk_cp_matrix
-                }
-         
-        for k, mat in mats.iteritems():
-            print >>stderr, "writing out %s..."%k
-            t=time.time()
-            df = pd.DataFrame(mat)
-            df.to_hdf("%s.%s.h5"%(fn_out,k),k,complevel=1,complib='zlib')
-            #df.to_hdf("%s.%s.h5"%(fn_out,k),k,complevel=5,complib='lzo')
-            #df.to_hdf("%s.%s.h5"%(fn_out,k),k)
-            print >>stderr, "done (%fs)"%(time.time()-t)
-        
-        #np.save("%s/%s.wnd_starts"%(o.gglob_dir, contig), wnd_starts)
-        #np.save("%s/%s.wnd_ends"%(o.gglob_dir, contig), wnd_ends)
-        #np.save("%s/%s.cp_matrix"%(o.gglob_dir, contig), cp_matrix)
-        #
-        #np.save("%s/%s.sunk_wnd_starts"%(o.gglob_dir, contig), sunk_wnd_starts)
-        #np.save("%s/%s.sunk_wnd_ends"%(o.gglob_dir, contig), sunk_wnd_ends)
-        #np.save("%s/%s.sunk_cp_matrix"%(o.gglob_dir, contig), sunk_cp_matrix)
-        
-
-        #np.savez_compressed("%s/%s"%(o.gglob_dir, contig), wnd_starts=wnd_starts,
-        #                                                   wnd_ends=wnd_ends, 
-        #                                                   cp_matrix=cp_matrix,
-        #                                                   sunk_wnd_starts=sunk_wnd_starts,
-        #                                                   sunk_wnd_ends=sunk_wnd_ends,
-        #                                                   sunk_cp_matrix=sunk_cp_matrix)
-        print >>stderr, "done (%f)"%(time.time()-t)
 
 

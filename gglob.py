@@ -23,6 +23,17 @@ class gglob:
     """
     
     @classmethod
+    def get_indivs(cls, DTS_dir, sunk_DTS_dir, DTS_prefix):
+        indivs = []
+        for f in glob.glob("%s/%s*"%(DTS_dir,DTS_prefix)):
+            indiv = f.split("/")[-1].replace(DTS_prefix,"") 
+            if os.path.exists("%s/%s%s"%(sunk_DTS_dir, DTS_prefix, indiv )):
+                indivs.append(indiv)
+            else:
+                print >>stderr, "skiping: %s - no associated sunk DTS"
+        return indivs
+
+    @classmethod
     def init_from_DTS(cls, **kwargs):
         """
         requires the below inputs
@@ -51,7 +62,6 @@ class gglob:
 
         fn_contigs = kwargs['fn_contigs']
         fn_sunk_contigs = kwargs['fn_sunk_contigs']
-
 
         DTS_pre="%s/%s"%(DTS_dir, DTS_prefix) 
         sunk_DTS_pre="%s/%s"%(sunk_DTS_dir, DTS_prefix) 

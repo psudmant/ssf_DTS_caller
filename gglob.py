@@ -30,7 +30,7 @@ class gglob:
             if os.path.exists("%s/%s%s"%(sunk_DTS_dir, DTS_prefix, indiv )):
                 indivs.append(indiv)
             else:
-                print >>stderr, "skiping: %s - no associated sunk DTS"
+                print >>stderr, "skiping: %s - no associated sunk DTS"%indiv
         return indivs
 
     @classmethod

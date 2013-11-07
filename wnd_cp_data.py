@@ -60,7 +60,8 @@ class wnd_cp_indiv:
                                    fn_dts,
                                    overwrite=False,
                                    openMode='r')
-        
+       
+       self.contigs = self.wnd_DTS.mContigNameLen
        self.starts=self.wnd_DTS["starts"]
        self.ends=self.wnd_DTS["ends"]
        self.cps=self.wnd_DTS["copy"]

@@ -30,7 +30,7 @@ class gglob:
             if os.path.exists("%s/%s%s"%(sunk_DTS_dir, DTS_prefix, indiv )):
                 indivs.append(indiv)
             else:
-                print >>stderr, "skiping: %s - no associated sunk DTS"%indiv
+                print >>stderr, "skipping: %s - no associated sunk DTS"%indiv
         return indivs
 
     @classmethod
@@ -57,6 +57,8 @@ class gglob:
         sunk_DTS_prefix = kwargs["sunk_DTS_prefix"]
         
         wnd_size = kwargs['wnd_size']
+        wnd_slide = kwargs['wnd_slide']
+
         indivs = kwargs['indivs']
         contig = kwargs['contig']
 
@@ -257,6 +259,7 @@ if __name__=="__main__":
         sunk_DTS_pre="%s/%s"%(o.sunk_DTS_dir, o.DTS_prefix) 
         
         wnd_size = idx_data['wnd_size']
+        wnd_slide = idx_data['wnd_slide']
         indivs = idx_data['indivs']
         n_indivs = len(indivs)
         contig = o.setup_chr
@@ -266,6 +269,7 @@ if __name__=="__main__":
                                 sunk_DTS_dir = o.sunk_DTS_dir,
                                 sunk_DTS_prefix = o.sunk_DTS_prefix,
                                 wnd_size = wnd_size,
+                                wnd_slide = wnd_slide,
                                 indivs = indivs,
                                 contig = contig,
                                 fn_contigs = o.fn_contigs,

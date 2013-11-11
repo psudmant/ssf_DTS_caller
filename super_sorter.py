@@ -118,10 +118,10 @@ if __name__=="__main__":
     contigs = ['chr%d'%d for d in xrange(1,23)]
     print contigs
     
-    HS_dups_out = bed_output("%s/hs_dups.bed"%o.outdir)
-    AH_dels_out = bed_output("%s/ah_dels.bed"%o.outdir)
-
-
+    
+    HS_dups_out = bed_output("%s/wssd_hs_dups.bed"%o.outdir)
+    sunk_HS_dups_out = bed_output("%s/sunk_hs_dups.bed"%o.outdir)
+    
     for contig in contigs:   
         print >>stderr, contig
         
@@ -138,6 +138,8 @@ if __name__=="__main__":
         
         coords = comp.test_pop_spec_dup(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, "human", "archaic")
         HS_dups_out.add(coords)
+        sunk_coords = comp.test_pop_spec_dup(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, "human", "archaic")
+        sunk_HS_dups_out.add(sunk_coords)
         #coords = comp.test_pop_spec_del(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, "archaic", "human")
         #AH_dels_out.add(coords)
 

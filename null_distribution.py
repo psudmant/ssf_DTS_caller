@@ -63,8 +63,7 @@ def plot_cum_density(density, edges, where):
 
 class null_distribution:
 
-    def __init__(self,tbx_gc):
-        self.tbx_gc = tbx_gc
+    def __init__(self):
         self.all_cps = np.array([])
         self.all_gc = np.array([])
         self.n = None

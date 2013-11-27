@@ -71,7 +71,6 @@ class wnd_cp_indiv:
     
     def get_overlapping_wnds(self,chr,tbx):
         wnd_starts, wnd_ends = self.get_wnds_by_chr(chr)
-        
         bnds = np.array([ [int(l[1]),int(l[2])] 
                             for l in tbx.fetch(chr,parser=pysam.asTuple()) ])
          

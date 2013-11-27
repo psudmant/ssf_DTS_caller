@@ -12,6 +12,6 @@ do
     ref=`echo $fname | awk -F "." '{print $2}'`
     zcat $indir/$f | awk -F '\t' -v OFS="\t" -v test=$test -v ref=$ref '{print ref,test,$0}'
 done
-) | gzip -c >$outdir/$indiv.csv.gz
+) | gzip -c >$outdir/$indiv.segs.gz
 
 

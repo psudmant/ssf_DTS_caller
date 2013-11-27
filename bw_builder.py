@@ -56,7 +56,8 @@ class output:
                                                                                                                          name,
                                                                                                                          fn_out)
         os.system(cmd)
-        os.unlink(fn_tmp)
+        print fn_tmp
+        #os.unlink(fn_tmp)
         fn_out_td = "%s.trackdef"%(fn_out)
         with open(fn_out_td,'w') as F:
             F.write(track_def)
@@ -101,7 +102,6 @@ if __name__=="__main__":
             n_mid = (n_s+n_e)/2
                    
             end = (n_mid+mid)/2
-            print cps[i]    
             c_out.add(contig, prev_start, end, cps[i])
             prev_start = end
          

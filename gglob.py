@@ -82,6 +82,7 @@ class gglob:
         correct = not (contig in ["chrY", "chrX"])
 
         for i, indiv in enumerate(indivs):
+            print >> stderr, indiv
             wnd_cp = wnd_cp_indiv("%s%s"%(DTS_pre, indiv),
                                   fn_contigs,
                                   wnd_size)

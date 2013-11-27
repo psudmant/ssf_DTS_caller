@@ -6,7 +6,6 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 import matplotlib.colors as mCols
-import matplotlib.colors as mCols
 import matplotlib.cm as cm
 import matplotlib.mlab as mlab
 

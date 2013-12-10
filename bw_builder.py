@@ -70,7 +70,7 @@ if __name__=="__main__":
     opts.add_option('','--fn_DTS',dest='fn_DTS', default=None)
     opts.add_option('','--contigs',dest='fn_contigs', default=None)
     opts.add_option('','--wnd_size',dest='wnd_size', type=int, default=None)
-    opts.add_option('','--wnd_slide',dest='wnd_slide', type=int, default=None)
+    #opts.add_option('','--wnd_slide',dest='wnd_slide', type=int, default=None)
     opts.add_option('','--out_dir',dest='out_dir')
     opts.add_option('','--fn_out',dest='fn_out')
     opts.add_option('','--DTS_prefix',dest='DTS_prefix', default="500_bp_")

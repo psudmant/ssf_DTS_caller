@@ -13,6 +13,7 @@ import scipy.spatial.distance as dist
 from sets import Set
 import networkx as nx
 import time
+import pysam
 
 class callset_table:
     """
@@ -41,6 +42,20 @@ class callset_table:
         print >>stderr, "filtering calls >%dbp"%(max_size)
         self.pd_table = self.pd_table[(self.pd_table['end']-self.pd_table['start'])<=max_size]
 
+    def output(self, fn_out):
+        print >>stderr, "outputting bed file of filtered calls..."
+        indiv=fn_out.split("/")[-1].split(".")[0]
+        Fout = open(fn_out,'w')
+        Fout.write("""track name="%s_indiv_calls" description="%s_indivs_calls" visibility=2 itemRgb="On"\n"""%(indiv, indiv))
+        for idx, row in self.pd_table.iterrows():
+            chr = row['chr']
+            start = row['start']
+            end = row['end']
+            p = np.log(row['p'])
+            ref = row['indiv_ref']
+            mu = row['mu']
+            Fout.write("%s\t%d\t%d\t%f_%s\t%f\t+\t%d\t%d\t%s\n"%(chr,start,end,p,ref,mu,start,end,"0,0,0"))
+        Fout.close()
 
     def filter(self, p_cutoff, size_cutoff):
         """
@@ -76,19 +91,21 @@ class cluster_calls:
         print >>stderr, "done (%fs)"%(time.time()-t)
         print >>stderr, "%d overlapping calls"%self.n_overlapping
     
-    def resolve_overlapping_clusters(self, verbose=False):
+    def resolve_overlapping_clusters(self, ll_cutoff, tbx_dups, verbose=False, min_overlapping=2):
         """
         resolve overlapping clusters into individual calls 
         let the calls have likelihoods
         """
-        ll_cutoff = -6.0
+        #ll_cutoff = -6.0
         print >>stderr, "resolving breakpoints..."
         final_calls = []
         
         for chr, overlapping_calls in self.overlapping_calls_by_chr.iteritems():
             print >>stderr, chr
             for overlap_cluster in overlapping_calls:
-                resolved_calls = overlap_cluster.resolve(0.85, ll_cutoff, min_size=2)
+                overlap_cutoff = 0.85
+                
+                resolved_calls = overlap_cluster.resolve(overlap_cutoff, ll_cutoff, tbx_dups, min_size=min_overlapping)
                 final_calls += resolved_calls
                 if verbose:
                     for call in resolved_calls:
@@ -185,12 +202,28 @@ class call_cluster:
         self.chr = chr
         self.size = 0
         self.log_likelihood =  None
+
         """
         'complex' refers to calls that have been 
         clustered (overlap) together, but reach significance
         self.compound = False 
         """
-         
+    def get_dup_overlap(self, tbx_dups):
+        #assuming dup file is collapsed
+        min_s = min(self.all_starts)
+        max_e = max(self.all_ends)
+        t = 0
+            
+        for l in tbx_dups.fetch(self.chr,min_s,max_e,parser=pysam.asTuple()):
+            c,s,e = l
+            s,e = int(s), int(e)
+            curr_s = s>min_s and s or min_s
+            curr_e = e<max_e and e or max_e
+            t += curr_e-curr_s
+        if t==0: return 0.0
+        
+        return float(t) / float(max_e - min_s)
+
     def add(self, call):
         self.calls.append(call)
         self.all_starts.append(call['start'])
@@ -198,6 +231,9 @@ class call_cluster:
         self.size+=1
     
     def over_simplify(self):
+        """
+        take all calls w/ the same start, and average their ends
+        """
         print >>stderr, "over-simplifying..."
         curr_call=[]
         new_calls = []
@@ -231,7 +267,10 @@ class call_cluster:
 
 
     def simplify(self):
-
+        """
+        take calls w/ identical breakpoints and pre-merge them 
+        reduces the complexity of the next n^2 operation
+        """
         curr_call=[]
         new_calls = []
         new_all_starts = []
@@ -286,6 +325,18 @@ class call_cluster:
                                                mu,
                                                10.0**self.get_log_likelihood(),
                                                size ]])
+        return ret_str
+
+    def get_bed_str(self):
+        
+        call = self.calls[0]
+        ret_str="%s\t%d\t%d\t%f\t%f\t+\t%d\t%d\t0,0,0"%(call["chr"],
+                                                     self.get_best_start(),
+                                                     self.get_best_end(),
+                                                     10.0**self.get_log_likelihood(),
+                                                     10.0**self.get_log_likelihood(),
+                                                     self.get_best_start(),
+                                                     self.get_best_end())
         return ret_str
             
     #def get_start(self):
@@ -394,13 +445,17 @@ class call_cluster:
             if new_group.get_log_likelihood()<ll_cutoff: new_groups.append(new_group)
         return new_groups
         
-    def resolve(self, overlap_cutoff, ll_cutoff, min_size=1, do_plot=False):
+    def resolve(self, overlap_cutoff, ll_cutoff, tbx_dups, min_size=1, do_plot=False):
         """
         though a bunch of calls may overlap, they may not be all 'good'
         or all the same call. Thus, further cluster overlapping calls
         into those with reciprocal overlap properties
+
+        we may wish to have diffferent properties for calls
+        that are in SDs 
         """
-         
+        frac_dup = self.get_dup_overlap(tbx_dups)
+
         if self.size <min_size: 
             return []
 
@@ -412,9 +467,28 @@ class call_cluster:
         #self.print_out()
         #print self.size
         if self.size == 1:
+            print self.get_log_likelihood()
             return self.get_log_likelihood < ll_cutoff and [CNV_call([self],self.chr)] or []
-                                                           
-        recip_overlap_clusts = self.cluster_by_recip_overlap(overlap_cutoff, ll_cutoff=ll_cutoff, plot=do_plot)
+        
+        #if frac_dup>.5:
+        if 0:
+            #simply flatten dup calls into one stretch
+            clust = call_cluster(self.chr) 
+            
+            start = min(self.all_starts)
+            end = max(self.all_ends)
+            p = 10**self.get_log_likelihood()
+            clust.add({"chr":self.chr,
+                       "start":start,
+                       "end":end,
+                       "p":p,
+                       "window_size":-1,
+                       "mu":-1,
+                       "indiv_ref":"merged",
+                       "indiv_test":"merged"})
+            recip_overlap_clusts = [clust]
+        else:
+            recip_overlap_clusts = self.cluster_by_recip_overlap(overlap_cutoff, ll_cutoff=ll_cutoff, plot=do_plot)
         
         
         overlapping_call_clusts = get_overlapping_call_clusts(recip_overlap_clusts)
@@ -439,6 +513,12 @@ class CNV_call:
     and the coordinates are the min and max of the med_start/ends
     """
     def __init__(self, clustered_calls, chr):
+        """
+        if a dup tabix is passed, see if the calls are largely duplicated 
+        if so, then flatten
+        """
+        min_dup_frac = 0.5
+
         self.clustered_calls = clustered_calls
         self.chr = chr
         
@@ -456,7 +536,13 @@ class CNV_call:
         for clust in self.clustered_calls:
             outstr+="%s\n"%(clust.get_call_str())
         return outstr
-    
+   
+    def bed_str(self):
+        outstr=""
+        for clust in self.clustered_calls:
+            outstr+="%s\n"%(clust.get_bed_str())
+        return outstr
+
     def get_indiv_calls_str(self):
         
         outstr=""
@@ -464,6 +550,14 @@ class CNV_call:
             outstr+=clust.get_indiv_calls_str()
         return outstr
     
+    def get_range(self):
+        s, e = 99999999999,-1
+        for clust in self.clustered_calls:
+            if clust.start<s: s=clust.start
+            if clust.end>e: e=clust.end
+
+        return s, e
+
     def print_verbose(self):
         print "%s\t%d\t%d\tll:%f\t%d clusts"%(self.chr, 
                                               self.start, 

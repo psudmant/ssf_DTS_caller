@@ -48,12 +48,17 @@ if __name__=="__main__":
     opts.add_option('', '--min_wnd_call_size', dest='min_wnds', type=int, default=2)
     opts.add_option('', '--max_callsize', dest='max_callsize', type=int, default=200000)
     opts.add_option('', '--segdups', dest='fn_seg_dups')
-    opts.add_option('', '--min_overlapping_calls', dest='min_overlapping_calls', type=int, default=2)
+    opts.add_option('', '--min_overlapping_calls', dest='min_overlapping_calls', type=int, default=1)
+    opts.add_option('', '--single_window_cutoff', dest='single_window_cutoff', type=float, default=1.0)
+    """
+        min_overlapping_calls in the minimum # of calls
+
+    """
     (o, args) = opts .parse_args()
     
     call_table = cluster.callset_table(o.fn_call_table) 
     call_table.filter_by_gsize(o.max_callsize)
-    call_table.filter(o.p_cutoff, o.min_wnds) 
+    call_table.filter(o.p_cutoff, o.min_wnds,single_window_cutoff, divide_by_mu=True) 
     call_table.output(o.fn_out_indiv_calls_bed)
     
     tbx_dups = pysam.Tabixfile(o.fn_seg_dups)

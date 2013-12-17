@@ -57,13 +57,21 @@ class callset_table:
             Fout.write("%s\t%d\t%d\t%f_%s\t%f\t+\t%d\t%d\t%s\n"%(chr,start,end,p,ref,mu,start,end,"0,0,0"))
         Fout.close()
 
-    def filter(self, p_cutoff, size_cutoff):
+    def filter(self, p_cutoff, size_cutoff, single_window_cutoff, divide_by_mu=False):
         """
         apply size cutoff (no calls of size 1 window!)
         """
         print >>stderr, "parsing calls with p<=%f and l>=%d..."%(p_cutoff, size_cutoff)
-        self.pd_table = self.pd_table[(self.pd_table['p']<p_cutoff)]
+        if divide_by_mu: 
+            self.pd_table = self.pd_table[((self.pd_table['p']/(self.pd_table['mu']**2))<p_cutoff)]
+        else:
+            self.pd_table = self.pd_table[(self.pd_table['p']<p_cutoff)]
+
         self.pd_table = self.pd_table[(self.pd_table['window_size']>=size_cutoff)]
+        ##for windows of size 1, if they exist, ensure they exceed the max_mu
+        self.pd_table = self.pd_table[(self.pd_table['window_size']>1)|(np.absolute(self.pd_table['mu'])>single_window_cutoff)]
+
+
         #self.pd_table = self.pd_table[( (self.pd_table['window_size']>=size_cutoff) |
         #                                (self.pd_table['p']>0) )]
         print >>stderr, "done"
@@ -467,8 +475,7 @@ class call_cluster:
         #self.print_out()
         #print self.size
         if self.size == 1:
-            print self.get_log_likelihood()
-            return self.get_log_likelihood < ll_cutoff and [CNV_call([self],self.chr)] or []
+            return self.get_log_likelihood() < ll_cutoff and [CNV_call([self],self.chr)] or []
         
         #if frac_dup>.5:
         if 0:

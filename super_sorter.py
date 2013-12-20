@@ -32,6 +32,19 @@ class comparator:
             
             print group, self.index_by_group[group]
     
+    def get_adjacent_wnds(self, poses):
+
+        dif = np.diff(poses)
+        not_one_pos = np.where(dif!=1)[0]
+        not_one_pos = np.r_[not_one_pos, poses.shape[0]-1]
+        pos_tups = []
+        curr_p = 0
+        for i in not_one_pos:
+            pos_tups.append([poses[curr_p], poses[i]+1])
+            curr_p = i+1
+                    
+        return pos_tups 
+
     def get_coordinates(self, contig, wnd_starts, wnd_ends, poses, mus):
 
         out_coords = []
@@ -39,9 +52,26 @@ class comparator:
         if poses.shape[0] == 0: 
             return out_coords
         
+        tups = self.get_adjacent_wnds(poses)
+        for t in tups:
+            p1, p2 = t
+            out_coords.append([contig, wnd_starts[p1], wnd_ends[p2-1],np.mean(mus[p1:p2])])
+
+        return out_coords
+          
+        """
+        self.get_adjacent_wnds(np.array([9,10,11,25,26,30,40,55]))
+        self.get_adjacent_wnds(np.array([9,11,25,26,30]))
+        self.get_adjacent_wnds(np.array([9,11,25,26]))
+        exit(1)
+        self.get_adjacent_wnds(poses)
+        print poses[0:1000]
+
         curr_cps = [mus[poses[0]]] 
         out_coords.append([contig, wnd_starts[poses[0]], wnd_ends[poses[0]],np.mean(np.array(curr_cps))])
         for i in xrange(1,poses.shape[0]):
+            if i%1000 == 0: print i
+
             if poses[i] == poses[i-1]+1: 
                 out_coords[-1][2] = wnd_ends[poses[i]]
                 curr_cps.append(mus[poses[i]]) 
@@ -51,6 +81,27 @@ class comparator:
                 out_coords.append([contig, wnd_starts[poses[i]], wnd_ends[poses[i]], np.mean(np.array(curr_cps))])
         
         return out_coords
+        """
+
+
+    def test_all_lt(self, contig, cps, wnd_starts, wnd_ends, max_cp=0.3):
+        """
+        test if all indivs in group1 have >cp than all indivs in group2
+        """
+        mu_all = np.mean(cps[:,:],0)
+
+        poses = np.where(mu_all<max_cp)[0]
+        return self.get_coordinates(contig, wnd_starts, wnd_ends, poses, mu_all)
+    
+    def test_all_gt(self, contig, cps, wnd_starts, wnd_ends, min_cp=3.7):
+        """
+        test if all indivs in group1 have >cp than all indivs in group2
+        """
+        mu_all = np.mean(cps[:,:],0)
+
+        poses = np.where(mu_all>min_cp)[0]
+        return self.get_coordinates(contig, wnd_starts, wnd_ends, poses, mu_all)
+
 
 
     def test_all_dup(self, contig, cps, wnd_starts, wnd_ends, min_cp=3.7):
@@ -126,11 +177,13 @@ if __name__=="__main__":
     #opts.add_option('','--inf',dest='fn_inf', default=None)
     #opts.add_option('','--outdir',dest='outdir', default=None)
 
-    opts.add_option('','--group1',dest='group1_indivs', default=None)
-    opts.add_option('','--group2',dest='group2_indivs', default=None)
+    opts.add_option('','--group1',dest='group1_indivs', default="-")
+    opts.add_option('','--group2',dest='group2_indivs', default="-")
     
     opts.add_option('','--outfile',dest='fn_out', default=None)
 
+    opts.add_option('','--test_all_gt',dest='t_all_gt', default=-1, type=float) 
+    opts.add_option('','--test_all_lt',dest='t_all_lt', default=-1, type=float) 
 
     opts.add_option('','--test_group1_dup',dest='t_g1_dup', default=False, action='store_true')
     opts.add_option('','--test_group1_del',dest='t_g1_del', default=False, action='store_true')
@@ -151,8 +204,6 @@ if __name__=="__main__":
     #contigs = ['chr%d'%d for d in xrange(22,23)]
     contigs = ['chr%d'%d for d in xrange(1,23)]
     
-    print contigs
-    
     #dups is dels too 
     if o.t_g1_dup:
         dups_out = bed_output("%s.dups.wssd.bed"%o.fn_out)
@@ -165,7 +216,15 @@ if __name__=="__main__":
     if o.t_all_dup:
         all_dup_out = bed_output("%s.all_dup.wssd.bed"%o.fn_out)
         all_sunk_dup_out = bed_output("%s.all_dup.sunk.bed"%o.fn_out)
-     
+    
+    if o.t_all_gt!=-1:
+        all_gt_out = bed_output("%s.all_gt.wssd.bed"%o.fn_out)
+        all_sunk_gt_out = bed_output("%s.all_gt.sunk.bed"%o.fn_out)
+    
+    if o.t_all_lt!=-1:
+        all_lt_out = bed_output("%s.all_lt.wssd.bed"%o.fn_out)
+        all_sunk_lt_out = bed_output("%s.all_lt.sunk.bed"%o.fn_out)
+
     for contig in contigs:   
         #if contig != "chr20": continue
         print >>stderr, contig
@@ -199,6 +258,18 @@ if __name__=="__main__":
             sunk_coords = comp.test_all_dup(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends)
             all_sunk_dup_out.add(sunk_coords)
 
+        if o.t_all_lt:
+            coords = comp.test_all_lt(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, max_cp = o.t_all_lt)
+            all_lt_out.add(coords)
+            sunk_coords = comp.test_all_lt(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, max_cp = o.t_all_lt)
+            all_sunk_lt_out.add(sunk_coords)
+        
+        if o.t_all_gt:
+            coords = comp.test_all_gt(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, min_cp = o.t_all_gt)
+            all_gt_out.add(coords)
+            sunk_coords = comp.test_all_gt(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, min_cp = o.t_all_gt)
+            all_sunk_gt_out.add(sunk_coords)
+
     if o.t_g1_dup:
         dups_out.output()
         sunk_dups_out.output()
@@ -210,4 +281,12 @@ if __name__=="__main__":
     if o.t_all_dup:
         all_dup_out.output()
         all_sunk_dup_out.output()
+
+    if o.t_all_lt:
+        all_lt_out.output()
+        all_sunk_lt_out.output()
+
+    if o.t_all_gt:
+        all_gt_out.output()
+        all_sunk_gt_out.output()
 

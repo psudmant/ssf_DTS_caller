@@ -92,6 +92,9 @@ class callset_table:
         self.pd_table = self.pd_table.sort(['chr', 'start', 'end', 'p'])
         print >>stderr, "done (%fs)"%(time.time()-t)
 
+
+
+
 class cluster_calls:
     
     def __init__(self, callset_table):
@@ -381,34 +384,6 @@ class cluster_calls:
                 var_calls.append(call)
 
         return var_calls
-
-    """
-    resolve overlapping clusters into individual calls 
-    let the calls have likelihoods
-    def __resolve_overlapping_clusters(self, ll_cutoff, tbx_dups, verbose=False, min_overlapping=2):
-        #ll_cutoff = -6.0
-        print >>stderr, "resolving breakpoints..."
-        final_calls = []
-        
-        for chr, overlapping_calls in self.overlapping_calls_by_chr.iteritems():
-            print >>stderr, chr
-            for overlap_cluster in overlapping_calls:
-                overlap_cutoff = 0.85
-                
-                resolved_calls = overlap_cluster.resolve(overlap_cutoff, 
-                                                         ll_cutoff, 
-                                                         tbx_dups, 
-                                                         min_size=min_overlapping, 
-                                                         flatten=True)
-                final_calls += resolved_calls
-                if verbose:
-                    for call in resolved_calls:
-                        call.print_verbose()
-                    
-        print >>stderr, "done"
-        print >>stderr, "%d calls with likelihood <%f"%(len(final_calls), ll_cutoff)
-        return final_calls
-    """
 
     def output_overlap_clusters(self, fn, id):
         """
@@ -849,144 +824,3 @@ class call_cluster:
             recip_overlap_clusts = [clust]
         else:
          """
-"""
-class CNV_call:
-    """
-    the purpose of this is, after filtering clustered calls
-    we want to have a final object represneting a CNV that's been called
-    It may (usually) will consist of ONE call_cluster, however, 
-    sometimes, multiple call_clusters overlap (just not enough to be clustered 
-    by recip overlap). In this case, the CNV call holds all of these, 
-    and the coordinates are the min and max of the med_start/ends
-    """
-    def __init__(self, clustered_calls, chr):
-        """
-        if a dup tabix is passed, see if the calls are largely duplicated 
-        if so, then flatten
-        """
-        min_dup_frac = 0.5
-
-        self.clustered_calls = clustered_calls
-        self.chr = chr
-        
-        best_ll = 1
-        for clust in clustered_calls:
-            if clust.get_log_likelihood() < best_ll:
-                self.best_start = clust.get_best_start()
-                self.best_end = clust.get_best_end()
-        
-        self.best_log_likelihood=best_ll
-    
-    def print_str(self):
-        
-        outstr=""
-        for clust in self.clustered_calls:
-            outstr+="%s\n"%(clust.get_call_str())
-        return outstr
-   
-    def bed_str(self):
-        outstr=""
-        for clust in self.clustered_calls:
-            outstr+="%s\n"%(clust.get_bed_str())
-        return outstr
-
-    def get_indiv_calls_str(self):
-        
-        outstr=""
-        for clust in self.clustered_calls:
-            outstr+=clust.get_indiv_calls_str()
-        return outstr
-    
-    def get_range(self):
-        s, e = 99999999999,-1
-        for clust in self.clustered_calls:
-            if clust.start<s: s=clust.start
-            if clust.end>e: e=clust.end
-
-        return s, e
-
-    def print_verbose(self):
-        print "%s\t%d\t%d\tll:%f\t%d clusts"%(self.chr, 
-                                              self.start, 
-                                              self.end, 
-                                              self.log_likelihood, 
-                                              len(self.clustered_calls))
-        for clust in self.clustered_calls:
-            print clust.chr, clust.get_best_start(), clust.get_best_end()
-            clust.print_out()
-
-"""
-
-    """ 
-    def assess(self):
-        self.calc_combined_p()
-        self.get_simple_bounds()
-       
-    def get_simple_bounds(self):
-        self.mode_start = int(stats.mode(np.array(self.all_starts))[0][0])
-        self.mode_end = int(stats.mode(np.array(self.all_ends))[0][0])
-        if self.mode_start > self.mode_end:
-            print "||||||||WARNING START > END||||||||||||"
-            print self.chr, self.mode_end, self.mode_start, self.mode_start - self.mode_end
-            self.print_out()
-            e = self.mode_end
-            self.mode_end = self.mode_start
-            self.mode_start = e
-
-    def calc_combined_p(self):
-        self.combined_log_p = 0 
-        for c in self.calls:
-            if c['p']==0: c['p']=1e-20
-            self.combined_log_p += -math.log(c['p'])
-    """ 
-
-
-
-
-
-"""
-def cluster_calls(calls):
-    
-    curr_max=calls.iloc[0]['end']
-    curr_chr=calls.iloc[0]['chr']
-    
-    call_clusters_by_chr = defaultdict(list)
-    curr_cluster = call_cluster() 
-
-    call_clusters_by_chr[curr_chr].append(curr_cluster)
-    n=1
-
-    for idx, row in calls.iterrows():
-        chr, start, end = row['chr'], row['start'], row['end']
-        
-        if start<curr_max and curr_chr == chr: #and curr_cluster.overlap(start,end)>0.4:
-            curr_cluster.add(row)
-        else:
-            curr_cluster.assess()
-            curr_cluster = call_cluster() 
-            curr_cluster.add(row)
-            call_clusters_by_chr[curr_chr].append(curr_cluster)
-            n+=1
-        
-        curr_max = end 
-        curr_chr = chr 
-    curr_cluster.assess()
-    
-    return call_clusters_by_chr, n
-
-
-def output_bed_of_clusters(call_clusters_by_chr, fn_out):
-    
-    F = open(fn_out,'w')
-        
-    for chr, clusters in call_clusters_by_chr.iteritems():
-        print chr
-        for cluster in sorted(clusters,key=lambda x: -x.combined_log_p):
-            print >>F, "%s\t%d\t%d\t%f"%(cluster.chr, cluster.mode_start, cluster.mode_end, cluster.combined_log_p) 
-"""
-
-
-
-
-
-

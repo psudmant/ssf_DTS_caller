@@ -9,6 +9,7 @@ import cluster
 
 import pysam
 
+from wnd_cp_data import wnd_cp_indiv, dCGH
 
 def output_calls(final_calls, fn):
     """
@@ -48,17 +49,36 @@ if __name__=="__main__":
     opts.add_option('', '--min_wnd_call_size', dest='min_wnds', type=int, default=2)
     opts.add_option('', '--max_callsize', dest='max_callsize', type=int, default=200000)
     opts.add_option('', '--segdups', dest='fn_seg_dups')
-    opts.add_option('', '--min_overlapping_calls', dest='min_overlapping_calls', type=int, default=1)
+    opts.add_option('', '--min_overlapping_calls', dest='min_overlapping_calls', type=int, default=2)
     opts.add_option('', '--single_window_cutoff', dest='single_window_cutoff', type=float, default=1.0)
-    """
-        min_overlapping_calls in the minimum # of calls
+    opts.add_option('', '--limit_to_chr', dest='limit_to_chr', default=None)
+    opts.add_option('', '--indiv_DTS', dest='fn_indiv_DTS', default=None)
+    opts.add_option('', '--ref_DTS', dest='fn_ref_DTS', default=None)
+     
+    opts.add_option('', '--contigs', dest='fn_contigs', default=None)
+    opts.add_option('', '--window_size', dest='window_size', type=int, default=None)
 
     """
+        min_overlapping_calls in the minimum # of calls
+    """
+    
     (o, args) = opts .parse_args()
     
+    indiv_DTS = wnd_cp_indiv(o.fn_indiv_DTS, o.fn_contigs, o.window_size) 
+    dCGHs = {}
+    for fn_ref in o.fn_ref_DTS.split(":"):
+        dCGHs[fn_ref.split("/")[-1].replace("500_bp_","")] = dCGH(o.fn_indiv_DTS, 
+                                                                  fn_ref,
+                                                                  o.fn_contigs,
+                                                                  o.window_size)
+        
     call_table = cluster.callset_table(o.fn_call_table) 
+    
+    if o.limit_to_chr:
+        call_table.filter_by_chr(o.limit_to_chr)
+    
     call_table.filter_by_gsize(o.max_callsize)
-    call_table.filter(o.p_cutoff, o.min_wnds,single_window_cutoff, divide_by_mu=True) 
+    call_table.filter(o.p_cutoff, o.min_wnds, o.single_window_cutoff, divide_by_mu=True) 
     call_table.output(o.fn_out_indiv_calls_bed)
     
     tbx_dups = pysam.Tabixfile(o.fn_seg_dups)
@@ -70,11 +90,15 @@ if __name__=="__main__":
     """
     name = o.fn_call_table.split("/")[-1].split(".")[0]
     call_clusterer = cluster.cluster_calls(call_table)
-    #call_clusterer.output_overlap_clusters(o.fn_out_indiv_calls_bed, name)
-    final_calls = call_clusterer.resolve_overlapping_clusters(-6, tbx_dups, verbose=False, min_overlapping=o.min_overlapping_calls)
+    call_clusterer.output_overlap_clusters(o.fn_out_indiv_calls_bed, name)
+    final_calls = call_clusterer.resolve_overlapping_clusters(-6, 
+                                                              tbx_dups,
+                                                              indiv_DTS,
+                                                              dCGHs,
+                                                              verbose=False, 
+                                                              min_overlapping=o.min_overlapping_calls)
+
     #output_indiv_clust_elements(final_calls, o.fn_out_resolved)
     output_calls(final_calls, o.fn_out_resolved)
     #output_bed(final_calls, o.fn_out_clustered_calls_bed)
     
-
-     

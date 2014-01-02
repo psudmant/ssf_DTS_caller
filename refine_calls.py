@@ -16,9 +16,10 @@ def output_calls(final_calls, fn):
     output ALL indivdiaul clusters making up calls
     """
     with open(fn, "w") as F:
-        F.write("%s\n"%("\t".join(["indiv_ref", "indiv_test", "chr", "start", "end", "mu",  "p", "window_size"])))
+        #F.write("%s\n"%("\t".join(["indiv_ref", "indiv_test", "chr", "start", "end", "mu",  "p", "window_size"])))
+        F.write("%s\n"%("\t".join(["chr", "start", "end", "called_refs, log_likelihood"])))
         for call in final_calls:
-            F.write("%s"%call.print_str())
+            F.write("%s\t%d\t%d\t%s\t%f\n"%(call.contig, call.start, call.end, ",".join(call.ref_indivs),call.total_ll))
 
 def output_bed(final_calls, fn):
     indiv  = fn.split("/")[-1].split(".")[0]

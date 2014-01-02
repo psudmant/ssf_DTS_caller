@@ -93,6 +93,16 @@ class callset_table:
         print >>stderr, "done (%fs)"%(time.time()-t)
 
 
+class simple_call:
+        
+    def __init__(self, contig, start, end, ref_indivs, resolved_calls):
+        self.contig = contig
+        self.start = start
+        self.end = end
+        self.ref_indivs  = ref_indivs #indivs CALLED over region
+        self.resolved_calls = resolved_calls
+
+        self.total_ll = np.sum(np.array([call.get_log_likelihood() for call in self.resolved_calls]))
 
 
 class cluster_calls:
@@ -147,26 +157,46 @@ class cluster_calls:
                                                                  min_overlapping=min_overlapping) 
                 
                 if len(resolved_calls) == 0: continue
-                self.get_final_call(
+                #overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls, flatten = True)
+
+                final_call = self.get_final_call(resolved_calls)
                 """
-                the best call looks to be the min best start and max best end
-                **COULD be an issue with DREADFUL long calls???
                 self.plot_call(resolved_calls, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps)
                 raw_input()
                 """
-                        
-                #cp_var_calls = self.filter_calls_by_cp(resolved_calls, indiv_cps, wnd_starts, wnd_ends)
                 #overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls, flatten = True)
-                
-                final_calls += resolved_calls
-                if verbose:
-                    for call in resolved_calls:
-                        call.print_verbose()
-                    
+                if not self.filter_call_by_size_cp(final_call, indiv_cps, wnd_starts, wnd_ends):
+                    final_calls += [final_call]
+
         print >>stderr, "done"
         print >>stderr, "%d calls with likelihood <%f"%(len(final_calls), ll_cutoff)
         return final_calls
 
+    def get_final_call(self, resolved_calls):
+        """
+        the best call looks to be the min best start and max best end
+        **COULD be an issue with DREADFUL long calls??? FOLLOW UP
+        """
+            
+        mn = 1e100
+        mx = -1
+
+        ref_indivs = []
+        contig = None
+
+        for call in resolved_calls: 
+            s,e = call.get_min_start_max_end()
+            s = call.get_best_start()
+            e = call.get_best_end()
+            mn = min(s,mn)
+            mx = max(e,mx)
+            contig = call.chr
+            ref_indivs+=call.ref_indivs
+        
+        ref_indivs=list(Set(ref_indivs))
+        
+        f_call = simple_call(contig, mn, mx, ref_indivs, resolved_calls)
+        return f_call
 
     def plot_call(self, resolved_calls, wnd_starts, wnd_ends, dCGHs, indiv_cps):
         
@@ -202,7 +232,7 @@ class cluster_calls:
         w_s, w_e = np.searchsorted(wnd_starts,mn), np.searchsorted(wnd_ends,mx)
         
 
-        self.get_best_call(resolved_calls, wnd_starts, wnd_ends, ref_indivs, dCGHs)
+        #self.get_best_call(resolved_calls, wnd_starts, wnd_ends, ref_indivs, dCGHs)
 
         wnd_start = w_s - 20 
         wnd_end = w_e + 20 
@@ -368,22 +398,24 @@ class cluster_calls:
         m = np.unravel_index(np.argmax(sums),sums.shape)
         return starts[m[0]], ends[m[1]], m[0], m[1]
 
-    def filter_calls_by_cp(self, resolved_calls, indiv_cps, wnd_starts, wnd_ends):
+    def filter_call_by_size_cp(self, final_call, indiv_cps, wnd_starts, wnd_ends, min_len=100000, cp_min=1.7, cp_max=2.3):
         """
-        make sure the locus doesn't look diploid
+        for calls > min_len
+            if they look normal, kill them
         """
-        
-        var_calls = [] 
-        for call in resolved_calls:
-            s, e = call.get_min_start_max_end()
-            wnd_start, wnd_end = np.searchsorted(wnd_starts,s), np.searchsorted(wnd_ends,e)
-            cp_min = np.min(indiv_cps[wnd_start:wnd_end])
-            cp_max = np.max(indiv_cps[wnd_start:wnd_end])
-            print "chr20", s, e, cp_min, cp_max
-            if cp_max>2.3 or cp_min <1.7:
-                var_calls.append(call)
+        s, e = final_call.start, final_call.end
 
-        return var_calls
+        if e-s < min_len:
+            return False
+        
+        wnd_start, wnd_end = np.searchsorted(wnd_starts,s), np.searchsorted(wnd_ends,e)
+        med_cp = np.median(indiv_cps[wnd_start:wnd_end])
+
+        if med_cp<cp_max and med_cp >cp_min:
+            #if call is in the normal range (c < max c > min) then filter! 
+            return True
+
+        return False 
 
     def output_overlap_clusters(self, fn, id):
         """

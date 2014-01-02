@@ -214,6 +214,7 @@ if __name__=="__main__":
     opts.add_option('','--wnd_slide',dest='wnd_slide', type=int, default=None)
     
     opts.add_option('','--DTS_prefix',dest='DTS_prefix', default="500_bp_")
+    opts.add_option('','--sunk_DTS_prefix',dest='sunk_DTS_prefix', default="500_bp_")
     
     opts.add_option('','--gglob_dir',dest='gglob_dir')
 

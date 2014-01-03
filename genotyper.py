@@ -110,7 +110,7 @@ class genotyper:
     
     def init_on_gglob(self, contig, fn_gglob):
         
-        g = gglob(contig, fn_gglob)
+        g = gglob.init_from_gglob_dir(contig, fn_gglob)
         
         self.indivs = g.indivs
         self.wnd_starts = g.wnd_starts

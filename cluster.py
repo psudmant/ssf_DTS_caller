@@ -21,15 +21,14 @@ from sets import Set
 
 class callset_table(object):
     """
-    a callset table must have columns with a test, reference
-        indiv_ref
-        indiv_test
         *chr
         *start
         *end
+        [indiv_ref
+        indiv_test
         mu
         p
-        window_size
+        window_size]
     """
 
     def __init__(self, fn_table):
@@ -63,6 +62,7 @@ class callset_table(object):
 class simple_callset_table(callset_table):
 
     def __init__(self, fn_table):
+        super(simple_callset_table, self).__init__(fn_table)
 
 
 
@@ -116,7 +116,7 @@ class simple_call:
         self.total_ll = np.sum(np.array([call.get_log_likelihood() for call in self.resolved_calls]))
 
 
-class cluster_calls:
+class indiv_cluster_calls:
     
     def __init__(self, callset_table):
         """

@@ -90,7 +90,7 @@ if __name__=="__main__":
     against the individual
     """
     name = o.fn_call_table.split("/")[-1].split(".")[0]
-    call_clusterer = cluster.cluster_calls(call_table)
+    call_clusterer = cluster.indiv_cluster_calls(call_table)
     call_clusterer.output_overlap_clusters(o.fn_out_indiv_calls_bed, name)
     final_calls = call_clusterer.resolve_overlapping_clusters(-6, 
                                                               tbx_dups,

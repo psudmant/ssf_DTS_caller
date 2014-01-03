@@ -89,8 +89,12 @@ class callset_table:
         """
         print >>stderr, "sorting..."
         t=time.time()
-        self.pd_table = self.pd_table.sort(['chr', 'start', 'end', 'p'])
+        self.pd_table = self.pd_table.sort(['chr', 'start', 'end'])
         print >>stderr, "done (%fs)"%(time.time()-t)
+
+
+class indiv_callset_table(callset_table):
+
 
 
 class simple_call:

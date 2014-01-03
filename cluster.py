@@ -835,35 +835,5 @@ class call_cluster:
                                                                  plot=do_plot)
         return recip_overlap_clusts
 
-        #overlapping_call_clusts = get_overlapping_call_clusts(recip_overlap_clusts, flatten = flatten)
-        #CNV_calls = [CNV_call(c, self.chr) for c in overlapping_call_clusts]
-        #
-        #if do_plot:
-        #    self.print_out()
-        #    for call_clust in sorted(recip_overlap_clusts, key=lambda x: x.get_log_likelihood()):
-        #        print "\t", call_clust.get_range_str(), call_clust.size, call_clust.get_log_likelihood()
-        #    for call in CNV_calls:
-        #        print ">final call:", call.print_str()
-        #
-        #return  CNV_calls
 
-        """
-        #if frac_dup>.5:
-        if 0:
-            #simply flatten dup calls into one stretch
-            clust = call_cluster(self.chr) 
-            
-            start = min(self.all_starts)
-            end = max(self.all_ends)
-            p = 10**self.get_log_likelihood()
-            clust.add({"chr":self.chr,
-                       "start":start,
-                       "end":end,
-                       "p":p,
-                       "window_size":-1,
-                       "mu":-1,
-                       "indiv_ref":"merged",
-                       "indiv_test":"merged"})
-            recip_overlap_clusts = [clust]
-        else:
-         """
+class cluster_

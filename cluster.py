@@ -19,7 +19,7 @@ import pysam
 
 from sets import Set
 
-class callset_table:
+class callset_table(object):
     """
     a callset table must have columns with a test, reference
         indiv_ref
@@ -50,7 +50,27 @@ class callset_table:
 
         print >>stderr, "filtering calls >%dbp"%(max_size)
         self.pd_table = self.pd_table[(self.pd_table['end']-self.pd_table['start'])<=max_size]
+    
+    def sort(self):
+        """
+        sort on chr, start, end
+        """
+        print >>stderr, "sorting..."
+        t=time.time()
+        self.pd_table = self.pd_table.sort(['chr', 'start', 'end'])
+        print >>stderr, "done (%fs)"%(time.time()-t)
 
+class simple_callset_table(callset_table):
+
+    def __init__(self, fn_table):
+
+
+
+class indiv_callset_table(callset_table):
+
+    def __init__(self, fn_table):
+        super(indiv_callset_table, self).__init__(fn_table)
+        
     def output(self, fn_out):
         print >>stderr, "outputting bed file of filtered calls..."
         indiv=fn_out.split("/")[-1].split(".")[0]
@@ -82,19 +102,6 @@ class callset_table:
         #self.pd_table = self.pd_table[( (self.pd_table['window_size']>=size_cutoff) |
         #                                (self.pd_table['p']>0) )]
         print >>stderr, "done"
-    
-    def sort(self):
-        """
-        sort on chr, start, end
-        """
-        print >>stderr, "sorting..."
-        t=time.time()
-        self.pd_table = self.pd_table.sort(['chr', 'start', 'end'])
-        print >>stderr, "done (%fs)"%(time.time()-t)
-
-
-class indiv_callset_table(callset_table):
-
 
 
 class simple_call:

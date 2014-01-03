@@ -73,7 +73,7 @@ if __name__=="__main__":
                                                                   o.fn_contigs,
                                                                   o.window_size)
         
-    call_table = cluster.callset_table(o.fn_call_table) 
+    call_table = cluster.indiv_callset_table(o.fn_call_table) 
     
     if o.limit_to_chr:
         call_table.filter_by_chr(o.limit_to_chr)

@@ -16,6 +16,7 @@ from sets import Set
 import networkx as nx
 import time
 import pysam
+import math
 
 from sets import Set
 
@@ -117,6 +118,10 @@ class simple_call:
 
 
 class indiv_cluster_calls:
+    """
+    a class to cluster calls made on one individual
+    compared to multiple dCGH references
+    """
     
     def __init__(self, callset_table):
         """
@@ -144,8 +149,8 @@ class indiv_cluster_calls:
         resolve overlapping clusters into individual calls 
         let the calls have likelihoods
             1. do the recip overlap cluster - clusters very similar calls w/ similar break-points
-            2. make sure there are at least 2 calls in there (w/ similar breakpoints)
-            *3. also make sure those calls are reasonable (not cp 2) ???really????
+            2. make sure there are at least 3 calls in there (w/ similar breakpoints)
+            3. make sure those calls sum to a log likelihood of <3
             4. collapse overlaps 
             5. get the best breakpoints
         """
@@ -161,6 +166,7 @@ class indiv_cluster_calls:
 
             for overlap_cluster in overlapping_calls:
                 overlap_cutoff = 0.85
+                #overlap_cutoff = 0.75
                 
                 resolved_calls = overlap_cluster.overlap_resolve(overlap_cutoff, 
                                                                  ll_cutoff, 
@@ -168,12 +174,18 @@ class indiv_cluster_calls:
                                                                  min_overlapping=min_overlapping) 
                 
                 if len(resolved_calls) == 0: continue
-                #overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls, flatten = True)
+                """
+                now take all these resolved calls,  
+                assume medians are the breakpoint
+                and cluster those that overlap   
+                """
+                overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls)
+                #resolved_calls = [resolved_calls]
 
                 final_call = self.get_final_call(resolved_calls)
-                """
                 self.plot_call(resolved_calls, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps)
                 raw_input()
+                """
                 """
                 #overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls, flatten = True)
                 if not self.filter_call_by_size_cp(final_call, indiv_cps, wnd_starts, wnd_ends):
@@ -232,6 +244,7 @@ class indiv_cluster_calls:
             s,e = call.get_min_start_max_end()
             print 'min,max', s,e
             print 'size,', call.size
+            print "ll", call.get_log_likelihood()
             s = call.get_best_start()
             e = call.get_best_end()
             print 'best', s,e
@@ -460,7 +473,7 @@ class indiv_cluster_calls:
         overlapping_calls_by_chr = defaultdict(list)
         #overlapping_calls = []
         
-        curr_cluster = call_cluster(curr_chr) 
+        curr_cluster = indiv_call_cluster(curr_chr) 
 
         overlapping_calls_by_chr[curr_chr].append(curr_cluster)
         n=1
@@ -470,7 +483,7 @@ class indiv_cluster_calls:
             if start<curr_max and curr_chr == chr:
                 curr_cluster.add(row)
             else:
-                curr_cluster = call_cluster(chr) 
+                curr_cluster = indiv_call_cluster(chr) 
                 curr_chr = chr
                 curr_max = end
                 curr_cluster.add(row)
@@ -490,7 +503,7 @@ def intersect(si,ei,sj,ej):
     else:
         return False
 
-def get_overlapping_call_clusts(calls, flatten = False):
+def get_overlapping_call_clusts(calls):
     
     G = nx.Graph()
     
@@ -503,35 +516,9 @@ def get_overlapping_call_clusts(calls, flatten = False):
             sj, ej = clust2.get_best_start(), clust2.get_best_end()
             if intersect(si,ei,sj,ej):
                 G.add_edge(clust1, clust2)
-    if not flatten:    
-        return nx.connected_components(G)
-    else:
-        flat_clusts = []
-        for overlap_c in nx.connected_components(G):
-            start = overlap_c[0].get_best_start()
-            end = overlap_c[0].get_best_end()
-            ll = 0 
-            for c in overlap_c:
-                if c.get_best_end() >end: 
-                    end = c.get_best_end()
-                if c.get_best_start() <start: 
-                    end = c.get_best_end()
-                ll+=c.get_log_likelihood()
-            curr_clust = call_cluster(overlap_c[0].chr)
-             
-            curr_clust.add({"chr":curr_clust.chr,
-                            "start":start,
-                            "end":end,
-                            "p":10**ll,
-                            "window_size":-1,
-                            "mu":-1,
-                            "indiv_ref":"flattened",
-                            "indiv_test":"flattened"})
-            flat_clusts.append([curr_clust])
+    return nx.connected_components(G)
 
-        return flat_clusts
-
-class call_cluster:
+class indiv_call_cluster:
     def __init__(self, chr):
         self.calls = []
         self.all_starts = []
@@ -541,11 +528,6 @@ class call_cluster:
         self.log_likelihood =  None
         self.ref_indivs = []
 
-        """
-        'complex' refers to calls that have been 
-        clustered (overlap) together, but reach significance
-        self.compound = False 
-        """
     def get_min_start_max_end(self):
         min_s = min(self.all_starts)
         max_e = max(self.all_ends)
@@ -702,11 +684,11 @@ class call_cluster:
         
         return sorted(dd_starts.iteritems(), key=lambda x: x[1])[0][0]
 
-    #def get_med_start(self):
-    #    return np.median(np.array(self.all_starts))
-    #
-    #def get_med_end(self):
-    #    return np.median(np.array(self.all_ends))
+    def get_med_start(self):
+        return np.median(np.array(self.all_starts))
+    
+    def get_med_end(self):
+        return np.median(np.array(self.all_ends))
 
     def get_log_likelihood(self, force=False):
 
@@ -759,7 +741,7 @@ class call_cluster:
         ax2.set_xlim([min(self.all_starts),max(self.all_ends)])
         ax2.set_ylim([-1,k+1])
 
-        plt.savefig('test.png')
+        plt.savefig('test2.png')
         plt.gcf().clear()
         
 
@@ -786,23 +768,23 @@ class call_cluster:
         
         if plot:
             self.plot(Z, cutoff)
-            raw_input()
         
         new_groups = []
         for grp in np.unique(grps):
-            new_group = call_cluster(self.chr) 
+            new_group = indiv_call_cluster(self.chr) 
             for idx in np.where(grps==grp)[0]:
                 new_group.add(self.calls[idx])
             if new_group.get_log_likelihood()<ll_cutoff and new_group.size >= min_overlapping: 
                 new_groups.append(new_group)
         return new_groups
         
-    def overlap_resolve(self, overlap_cutoff, ll_cutoff, tbx_dups, min_overlapping=1, do_plot=False):
+    def overlap_resolve(self, overlap_cutoff, ll_cutoff, tbx_dups, min_overlapping=1, do_plot=True):
         """
         though a bunch of calls may overlap, they may not be all 'good'
         or all the same call. Thus, further cluster overlapping calls
         into those with reciprocal overlap properties
-
+            
+        ***testing, output just recip overlap calls
         criteria for a call
         1. at least 2 calls reciprical overlap and look the same
         2. a.) after recip overlpa the sum of the lls is <ll_cutoff (-ve)
@@ -815,10 +797,10 @@ class call_cluster:
         if self.size <min_overlapping: 
             return []
 
-        if self.size>1000: 
-            self.over_simplify()
-        else:
-            self.simplify()
+        #if self.size>1000: 
+        #    self.over_simplify()
+        #else:
+        #    self.simplify()
         
         """
         single event (in the event that we ARE allowing them, by default)
@@ -836,4 +818,93 @@ class call_cluster:
         return recip_overlap_clusts
 
 
-class cluster_
+
+class call_cluster(object):
+    """
+    similar to indiv_call_cluster but for use on
+    calls made amongst individuals
+    """
+    
+    def __init__(self):
+        self.calls = []
+        self.starts = []
+        self.ends = []
+        self.lengths = []
+        
+    def add(self, call):
+        self.calls.append(call)
+        self.starts.append(call['start'])
+        self.ends.append(call['end'])
+        self.lengths.append(call['end']-call['start'])
+    
+    def get_min_max_start_end(self):
+        return min(self.starts), max(self.ends)
+        
+class cluster_callsets(object):
+    """
+    a class to cluster calls from multiple individuals
+    into sets fot genotyping attempting to separate out
+    calls that are overlapping but very different in their 
+    breakpoints into distinct clusters
+    """
+    def __init__(self, fn_table, contig):
+        
+        self.contig = contig
+        self.callset_table = simple_callset_table(fn_table)
+        self.callset_table.sort()
+        self.callset_table.filter_by_chr(self.contig)
+    
+    def get_genotypable_loci(self, total_subsets, subset):
+        overlapping_calls, n = self.get_overlapping_calls()
+        print >>stderr, "%d overlapping calls"%n
+        return self.generate_call_coordinates(overlapping_calls, total_subsets, subset)
+        """
+        want to remove calls that are in FEW individuals, and WAY different
+        """
+        #for call in overlapping_calls:
+        #    print "chr20", call.get_min_max_start_end(), len(call.calls), call.lengths
+
+    def generate_call_coordinates(self,calls, total_subsets, subset):
+        
+        l = len(calls)
+        calls_to_assess = []
+
+        i=subset
+        while i<l:
+            calls_to_assess.append(calls[i])
+            i+=total_subsets
+
+        for call in calls_to_assess:
+            yield call.get_min_max_start_end()
+
+
+    def get_overlapping_calls(self):
+        """
+        glob up all those calls that physically overlap
+        assumes self.callset_table is sorted
+        """
+        curr_max=self.callset_table.pd_table.iloc[0]['end']
+        
+        overlapping_calls =  []
+        curr_cluster = call_cluster() 
+
+        overlapping_calls.append(curr_cluster)
+        n=1
+
+        for idx, call in self.callset_table.pd_table.iterrows():
+            chr, start, end = call['chr'], call['start'], call['end']
+            if start<curr_max:
+                curr_cluster.add(call)
+            else:
+                curr_cluster = call_cluster() 
+                curr_max = end
+                curr_cluster.add(call)
+                overlapping_calls.append(curr_cluster)
+                n+=1
+            
+            curr_max = max(end, curr_max) 
+        
+        return overlapping_calls, n
+        
+
+

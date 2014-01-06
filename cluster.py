@@ -93,7 +93,9 @@ class indiv_callset_table(callset_table):
         """
         print >>stderr, "parsing calls with p<=%f and l>=%d..."%(p_cutoff, size_cutoff)
         if divide_by_mu: 
-            self.pd_table = self.pd_table[((self.pd_table['p']/np.exp((self.pd_table['mu']**2)))<p_cutoff)]
+            where_p_sig=((self.pd_table['p']/np.exp((self.pd_table['mu']**2)))<p_cutoff)
+            where_mu_sig=(np.absolute(self.pd_table['mu'])>0.5)
+            self.pd_table = self.pd_table[(where_p_sig | where_mu_sig)]
         else:
             self.pd_table = self.pd_table[(self.pd_table['p']<p_cutoff)]
 
@@ -113,7 +115,7 @@ class simple_call:
         self.end = end
         self.ref_indivs  = ref_indivs #indivs CALLED over region
         self.resolved_calls = resolved_calls
-
+        self.length = self.end-self.start
         self.total_ll = np.sum(np.array([call.get_log_likelihood() for call in self.resolved_calls]))
 
 
@@ -144,7 +146,7 @@ class indiv_cluster_calls:
         return curr_dCGHs
 
 
-    def resolve_overlapping_clusters(self, ll_cutoff, tbx_dups, indiv_DTS, dCGHs, verbose=False, min_overlapping=2):
+    def resolve_overlapping_clusters(self, ll_cutoff, tbx_dups, indiv_DTS, ref_DTSs, dCGHs, verbose=False, min_overlapping=2):
         """
         resolve overlapping clusters into individual calls 
         let the calls have likelihoods
@@ -161,6 +163,10 @@ class indiv_cluster_calls:
             print >>stderr, chr
             
             indiv_cps = indiv_DTS.get_cps_by_chr(chr) 
+            ref_cps = {}
+            for ref, refDTS in ref_DTSs.iteritems():
+                ref_cps[ref] = refDTS.get_cps_by_chr(chr) 
+                
             curr_dCGHs = self.get_curr_chr_dCGHs(chr, dCGHs)
             wnd_starts, wnd_ends = indiv_DTS.get_wnds_by_chr(chr)
 
@@ -177,19 +183,49 @@ class indiv_cluster_calls:
                 """
                 now take all these resolved calls,  
                 assume medians are the breakpoint
-                and cluster those that overlap   
-                """
-                overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls)
-                #resolved_calls = [resolved_calls]
+                and cluster those that STILL overlap (shoudln't be a ton...?)  
 
-                final_call = self.get_final_call(resolved_calls)
+                if min(overlap_cluster.all_starts)>1545000 and min(overlap_cluster.all_starts)<1625000:
+                    self.plot_call(resolved_calls, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps)
+                    #overlappilf.get_final_call(resolved_calls)
+                    raw_input()
+                """
+
+                overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls)
+
+                for clust in overlapping_call_clusts:
+                    final_call = self.get_final_call(clust)
+                    """
+                    THERE IS A PROBLEM HERE!
+                    what if everyone is 4 and this guy is 2? no, not good, 
+                    need to consider the DELTA
+
+                    OK, so, basically here, need to do a mini genotypuing
+                    ******************
+                    *****************
+                    **************
+                    
+                    NOT how it should be below, jus ta test
+                    """
+                    d = self.get_delta(final_call, clust, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps, ref_cps)
+                    if final_call.length>100000:
+                        if d>0.5: 
+                            final_calls += [final_call]
+                    else:        
+                        final_calls += [final_call]
+                    """
+                    if not self.filter_call_by_size_cp(final_call, indiv_cps, wnd_starts, wnd_ends):
+                        final_calls += [final_call]
+                        self.plot_call(clust, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps, ref_cps)
+                        self.get_delta(final_call, clust, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps, ref_cps)
+                        raw_input()
+                    """
+
+                """
                 self.plot_call(resolved_calls, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps)
                 raw_input()
                 """
-                """
                 #overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls, flatten = True)
-                if not self.filter_call_by_size_cp(final_call, indiv_cps, wnd_starts, wnd_ends):
-                    final_calls += [final_call]
 
         print >>stderr, "done"
         print >>stderr, "%d calls with likelihood <%f"%(len(final_calls), ll_cutoff)
@@ -221,7 +257,25 @@ class indiv_cluster_calls:
         f_call = simple_call(contig, mn, mx, ref_indivs, resolved_calls)
         return f_call
 
-    def plot_call(self, resolved_calls, wnd_starts, wnd_ends, dCGHs, indiv_cps):
+    def get_delta(self, final_call, resolved_calls, wnd_starts, wnd_ends, dCGHs, indiv_cps, ref_cps):
+
+        w_s, w_e = np.searchsorted(wnd_starts,final_call.start), np.searchsorted(wnd_ends,final_call.end)
+        
+        ref_indivs = []
+        for call in resolved_calls:
+            ref_indivs+=call.ref_indivs
+
+        ref_indivs=list(Set(ref_indivs))
+        ds = []
+        for ref in ref_indivs:
+            d = np.mean(indiv_cps[w_s:w_e]-ref_cps[ref][w_s:w_e])
+            ds.append(d)
+        
+        return np.mean(np.absolute(np.array(ds)))
+        #print ds, np.mean(np.absolute(np.array(ds))), np.median(np.absolute(np.array(ds))) 
+        
+
+    def plot_call(self, resolved_calls, wnd_starts, wnd_ends, dCGHs, indiv_cps, ref_cps):
         
         """
         choose the call that maximizes the delta between the outside windows and the inside windows
@@ -245,8 +299,10 @@ class indiv_cluster_calls:
             print 'min,max', s,e
             print 'size,', call.size
             print "ll", call.get_log_likelihood()
-            s = call.get_best_start()
-            e = call.get_best_end()
+            #s = call.get_best_start()
+            #e = call.get_best_end()
+            s = call.get_med_start()
+            e = call.get_med_end()
             print 'best', s,e
             mn = min(s,mn)
             mx = max(e,mx)
@@ -255,7 +311,6 @@ class indiv_cluster_calls:
         ref_indivs=list(Set(ref_indivs))
         w_s, w_e = np.searchsorted(wnd_starts,mn), np.searchsorted(wnd_ends,mx)
         
-
         #self.get_best_call(resolved_calls, wnd_starts, wnd_ends, ref_indivs, dCGHs)
 
         wnd_start = w_s - 20 
@@ -315,7 +370,11 @@ class indiv_cluster_calls:
         
         #t_vect = t_vect*t_vect
         axes[0,1].plot(mids, t_vect)
-        axes[1,0].plot(mids, indiv_cps[wnd_start:wnd_end])
+        axes[1,0].plot(mids, indiv_cps[wnd_start:wnd_end],'g', lw=1)
+        axes[1,0].plot(mids, indiv_cps[wnd_start:wnd_end],'.g')
+        for ref, cps in ref_cps.iteritems():
+            axes[1,0].plot(mids, cps[wnd_start:wnd_end], lw=.1)
+            
         for i in xrange(2):
             for j in xrange(2):
                 axes[i,j].set_xlim([plt_s,plt_e])
@@ -510,10 +569,10 @@ def get_overlapping_call_clusts(calls):
     for call in calls:
         G.add_node(call)
 
-    for clust1 in recip_overlap_clusts:
-        si, ei = clust1.get_best_start(), clust1.get_best_end()
-        for clust2 in recip_overlap_clusts:
-            sj, ej = clust2.get_best_start(), clust2.get_best_end()
+    for clust1 in calls:
+        si, ei = clust1.get_med_start(), clust1.get_med_end()
+        for clust2 in calls:
+            sj, ej = clust2.get_med_start(), clust2.get_med_end()
             if intersect(si,ei,sj,ej):
                 G.add_edge(clust1, clust2)
     return nx.connected_components(G)
@@ -778,7 +837,7 @@ class indiv_call_cluster:
                 new_groups.append(new_group)
         return new_groups
         
-    def overlap_resolve(self, overlap_cutoff, ll_cutoff, tbx_dups, min_overlapping=1, do_plot=True):
+    def overlap_resolve(self, overlap_cutoff, ll_cutoff, tbx_dups, min_overlapping=1, do_plot=False):
         """
         though a bunch of calls may overlap, they may not be all 'good'
         or all the same call. Thus, further cluster overlapping calls

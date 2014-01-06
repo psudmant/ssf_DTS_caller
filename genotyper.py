@@ -173,11 +173,12 @@ class genotyper:
 
     def plot(self, X, Xs, gmmX, gmmXs, v_bndsX, v_bndsXs, Z, Zs, chr, start, end):
         
+        
         cps = np.mean(X, 1)
         sunk_cps = np.mean(Xs, 1)
         
         plt.rc('grid',color='0.75',linestyle='l',linewidth='0.1')
-        fig, axarr = plt.subplots(2, 3)
+        fig, axarr = plt.subplots(3, 3)
         fig.set_figwidth(11)
         fig.set_figheight(8.5)
         axescolor  = '#f6f6f6'
@@ -186,21 +187,41 @@ class genotyper:
         axarr[0,0].set_xlim(-0.10,max(cps)+1)
         axarr[0,0].set_ylim(-0.10,max(sunk_cps)+1)
         
-        n, bins, patches = axarr[0,1].hist(cps,alpha=.9,ec='none',normed=1,color='r',bins=len(cps)/20)
-        self.addGMM(gmmX, axarr[0,1], cps)
+        print len(cps)/20 
+        print cps
+        n, bins, patches = axarr[1,1].hist(cps,alpha=.9,ec='none',normed=1,color='r',bins=len(cps)/20)
+        self.addGMM(gmmX, axarr[1,1], cps)
         fig.sca(axarr[0,2]) 
         dendro = hclust.dendrogram(Z, orientation='right')
         #self.aug_dendrogram(axarr[0,2], dendro)
 
         n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,color='g',bins=len(cps)/20)
         self.addGMM(gmmXs, axarr[1,0], sunk_cps)
-        axarr[1,1].plot(v_bndsX[0], v_bndsX[1], 'ro-')
-        axarr[1,1].plot(v_bndsXs[0], v_bndsXs[1], 'go-')
+        axarr[0,1].plot(v_bndsX[0], v_bndsX[1], 'ro-')
+        axarr[0,1].plot(v_bndsXs[0], v_bndsXs[1], 'go-')
         
         fig.sca(axarr[1,2]) 
         dendro = hclust.dendrogram(Zs, orientation='right')
         #self.aug_dendrogram(axarr[1,2], dendro)
+
+        #plot actual position
+
+        #def get_gt_matrix(self, contig, start, end, vb=False):
+        #    assert contig == self.contig
+        #    start_idx = np.searchsorted(self.wnd_starts, start)
+        #    end_idx = np.searchsorted(self.wnd_ends, end)
         
+        idx_s, idx_e = np.where(self.wnd_starts==start)[0], np.where(self.wnd_ends==end)[0] 
+        s_idx_s, s_idx_e = np.searchsorted(self.sunk_wnd_starts, start),  np.searchsorted(self.sunk_wnd_ends, end)
+        xs = (self.wnd_starts[idx_s:idx_e]+self.wnd_ends[idx_s:idx_e])/2.0
+        s_xs = (self.sunk_wnd_starts[s_idx_s:s_idx_e]+self.sunk_wnd_ends[s_idx_s:s_idx_e])/2.0
+        print "shapes", X.shape, Xs.shape
+
+        for i in xrange(X.shape[0]):
+            axarr[2,1].plot(xs, X[i,:])
+            axarr[2,0].plot(s_xs, Xs[i,:])
+        axarr[2,1].set_xlim(start,end) 
+        axarr[2,0].set_xlim(start,end) 
         fig.savefig("%s/%s-%d-%d.png"%(self.plot_dir, chr, start, end))
         plt.close()
 
@@ -248,11 +269,13 @@ class genotyper:
         assert contig == self.contig
         start_idx = np.searchsorted(self.wnd_starts, start)
         end_idx = np.searchsorted(self.wnd_ends, end)
-        
+
         X = self.cp_matrix[:,start_idx:end_idx]
         if vb:
             print "idxs:", start_idx, end_idx
             print X
+        
+        X[np.isnan(X)] = 0
         return X
     
     def get_sunk_gt_matrix(self, contig, start, end, vb=False):
@@ -265,6 +288,8 @@ class genotyper:
         if vb:
             print "idxs:", start_idx, end_idx
             print X
+        
+        X[np.isnan(X)] = 0
         return X
     
     def get_gt_matrix_mu(self, contig, start, end):
@@ -302,33 +327,27 @@ class genotyper:
         #cv_types = ['spherical', 'tied', 'diag', 'full']
         """
         mus = np.mean(X,1)
-        #mus = np.median(X,1)
         mus = np.reshape(mus, (mus.shape[0],1))
         
-        #round_mus = np.around(mus) 
-        #init_mus = list(np.unique(round_mus))
-        #
-        #init_weights = []
-        #for comp in init_mus:
-        #    init_weights.append(float(np.sum(round_mus==comp))/len(round_mus))
-        
         dist_mat = dist.pdist(mus)
-        #Z = hclust.linkage(dist_mat, method='single')
-        #Z = hclust.linkage(dist_mat, method='single')
-        #Z = hclust.linkage(dist_mat, method='average')
         Z = hclust.linkage(mus, method='centroid', metric='euclidean')
-        
         params, bics, gmms, all_labels = [], [], [], []
         
+        prev_grps = np.array([])
         for k in np.arange(.2, 0.7,  0.01):
             grps = hclust.fcluster(Z, k, criterion='distance')
+            if np.all(grps == prev_grps): continue
+
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
+
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
+
             params.append(len(init_mus))
             bics.append(ic)
             gmms.append(gmm)
             all_labels.append(labels)
-        
+            prev_grps = grps 
+
         grps = np.zeros(mus.shape[0])
         init_mus, init_vars, init_weights = self.initialize(mus, grps) 
         gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)

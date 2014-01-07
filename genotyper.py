@@ -128,51 +128,17 @@ class GMM_gt(object):
 class genotyper:
     
     def init_on_indiv_DTS_files(self, **kwargs):
-        self.dts_dir = kwargs.get("dts_dir", None) 
-        self.sunk_dts_dir = kwargs.get("sunk_dts_dir", None) 
-        self.fn_contigs  = kwargs.get("fn_contigs", None) 
-        self.fn_sunk_contigs  = kwargs.get("fn_sunk_contigs", None) 
-        self.wnd_size  = kwargs.get("wnd_size", None) 
-        self.F_fnToIndiv = kwargs.get("F_fnToIndiv", lambda x: x.split("/")[-1].replace("500_bp_",""))
+
+        g = gglob.init_from_DTS(**kwags)
+
+        self.indivs = g.indivs
+        self.wnd_starts = g.wnd_starts
+        self.wnd_ends = g.wnd_ends
+        self.sunk_wnd_starts = g.sunk_wnd_starts
+        self.sunk_wnd_ends = g.sunk_wnd_ends
         
-        self.i_by_indiv = {}
-        fn_DTSs = glob.glob("%s/%s*"%(dts_dir, DTS_prefix))
-        
-        n_indivs = limit_to_n and limit_to_n or len(fn_DTSs)
-        
-        rand_wnd_cp = wnd_cp_indiv(fn_DTSs[0], fn_contigs, wnd_size)
-        self.wnd_starts, self.wnd_ends = rand_wnd_cp.get_wnds_by_chr(contig)
-        self.cp_matrix = np.zeros((n_indivs, self.wnd_starts.shape[0]))
-
-        if self.has_sunk_cps:
-            fn_sunk_DTSs = glob.glob("%s/%s*"%(sunk_dts_dir, DTS_prefix))
-            rand_sunk_wnd_cp = wnd_cp_indiv(fn_sunk_DTSs[0], fn_sunk_contigs, wnd_size)
-            self.sunk_wnd_starts, self.sunk_wnd_ends = rand_sunk_wnd_cp.get_wnds_by_chr(contig)
-            self.sunk_cp_matrix = np.zeros((n_indivs, self.sunk_wnd_starts.shape[0]))
-
-        if 0:
-            for i, fn_DTS in enumerate(fn_DTSs):
-                if limit_to_n and i>=limit_to_n: break
-
-                indiv = F_fnToIndiv(fn_DTS)
-                wnd_cp = wnd_cp_indiv(fn_DTS,
-                                      fn_contigs,
-                                      wnd_size)
-                
-                self.indivs.append(indiv)
-                self.cp_matrix[i,:] = wnd_cp.get_cps_by_chr(contig,correct=True) 
-
-                if self.has_sunk_cps:
-                    wnd_cp = wnd_cp_indiv("%s/%s%s"%(sunk_dts_dir, DTS_prefix, indiv),
-                                          fn_sunk_contigs,
-                                          wnd_size)
-                    self.sunk_cp_matrix[i,:] = wnd_cp.get_cps_by_chr(contig, correct=True) 
-                                                                         
-            np.save("./tmp_cp_matrix", self.cp_matrix)
-            np.save("./tmp_sunk_cp_matrix", self.sunk_cp_matrix)
-        else:
-            self.cp_matrix = np.load("./tmp_cp_matrix.npy") 
-            self.sunk_cp_matrix = np.load("./tmp_sunk_cp_matrix.npy") 
+        self.cp_matrix = g.cp_matrix
+        self.sunk_cp_matrix = g.sunk_cp_matrix
 
     
     def init_on_gglob(self, contig, fn_gglob):

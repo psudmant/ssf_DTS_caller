@@ -27,6 +27,8 @@ import scipy.cluster.hierarchy as hclust
 from wnd_cp_data import wnd_cp_indiv
 from gglob import gglob
 
+import cluster as m_cluster
+
 class call:
 
     def __init__(self, chr, start, end, X, labels, s):
@@ -57,6 +59,71 @@ class genotype_table:
                                 call.end,
                                 call.s,
                                 "\t".join([str(l) for l in call.labels])))
+
+
+def get_best_gt(call, contig, g):
+    
+    max_bic_d = -9e9
+    best_call = []
+    best_se = []
+    for s in np.unique(np.array(call.starts)):
+        for e in np.unique(np.array(call.ends)):
+
+            X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
+            Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
+            gX = g.GMM_genotype(X)
+            gXs = g.GMM_genotype(Xs)
+
+            d1 = gX.get_bic_delta()
+            d2 = gXs.get_bic_delta()
+
+            if max(d1, d2) > max_bic_d:
+               max_bic_d = max(d1, d2) 
+               best_inf = [gX, gXs, s,e,idx_s, idx_e, s_idx_s, s_idx_e]
+            #if min(gX.min_bic, gXs.min_bic) < min_bic:
+            #   min_bic = min(gX.min_bic, gXs.min_bic) 
+            #   best_inf = [gX, gXs, s,e,idx_s, idx_e, s_idx_s, s_idx_e]
+            g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e)
+   
+    gX, gXs, s, e, idx_s, idx_e, s_idx_s, s_idx_e = best_inf
+    g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e)
+    print s, e
+    #raw_input()
+    
+
+
+class GMM_gt(object):
+
+    def __init__(self, X, gmm, labels, Z, params, bics):
+        self.X = X
+        self.gmm = gmm
+        self.labels = labels
+        self.Z = Z
+        self.params = params
+        self.bics = bics
+        self.min_bic = min(self.bics)
+
+        self.best_idx = self.bics.index(self.min_bic) 
+        self.n_clusts = self.params[self.best_idx]
+    
+    def get_bic_delta(self):
+        
+        if self.n_clusts+1 in self.params:
+            idx_bic_r = self.params.index(self.n_clusts+1) 
+            bic_r = self.bics[idx_bic_r]
+        else:
+            bic_r = self.min_bic
+    
+        if self.n_clusts-1 in self.params:
+            idx_bic_l = self.params.index(self.n_clusts-1) 
+            bic_l = self.bics[idx_bic_l]
+        else:
+            bic_l = self.min_bic
+        
+        delta = bic_r-self.min_bic+bic_l-self.min_bic
+        return delta
+
+
 
 class genotyper:
     
@@ -171,9 +238,11 @@ class genotyper:
                          textcoords='offset points',
                          va='top', ha='center')
 
-    def plot(self, X, Xs, gmmX, gmmXs, v_bndsX, v_bndsXs, Z, Zs, chr, start, end):
+    def plot(self, gX, gXs, chr, start, end, idx_s, idx_e, s_idx_s, s_idx_e):
         
-        
+        X = gX.X
+        Xs = gXs.X
+
         cps = np.mean(X, 1)
         sunk_cps = np.mean(Xs, 1)
         
@@ -187,21 +256,19 @@ class genotyper:
         axarr[0,0].set_xlim(-0.10,max(cps)+1)
         axarr[0,0].set_ylim(-0.10,max(sunk_cps)+1)
         
-        print len(cps)/20 
-        print cps
         n, bins, patches = axarr[1,1].hist(cps,alpha=.9,ec='none',normed=1,color='r',bins=len(cps)/20)
-        self.addGMM(gmmX, axarr[1,1], cps)
+        self.addGMM(gX.gmm, axarr[1,1], cps)
         fig.sca(axarr[0,2]) 
-        dendro = hclust.dendrogram(Z, orientation='right')
+        dendro = hclust.dendrogram(gX.Z, orientation='right')
         #self.aug_dendrogram(axarr[0,2], dendro)
-
+        
         n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,color='g',bins=len(cps)/20)
-        self.addGMM(gmmXs, axarr[1,0], sunk_cps)
-        axarr[0,1].plot(v_bndsX[0], v_bndsX[1], 'ro-')
-        axarr[0,1].plot(v_bndsXs[0], v_bndsXs[1], 'go-')
+        self.addGMM(gXs.gmm, axarr[1,0], sunk_cps)
+        axarr[0,1].plot(gX.params, gX.bics, 'ro-')
+        axarr[0,1].plot(gXs.params, gXs.bics, 'go-')
         
         fig.sca(axarr[1,2]) 
-        dendro = hclust.dendrogram(Zs, orientation='right')
+        dendro = hclust.dendrogram(gXs.Z, orientation='right')
         #self.aug_dendrogram(axarr[1,2], dendro)
 
         #plot actual position
@@ -211,11 +278,14 @@ class genotyper:
         #    start_idx = np.searchsorted(self.wnd_starts, start)
         #    end_idx = np.searchsorted(self.wnd_ends, end)
         
-        idx_s, idx_e = np.where(self.wnd_starts==start)[0], np.where(self.wnd_ends==end)[0] 
-        s_idx_s, s_idx_e = np.searchsorted(self.sunk_wnd_starts, start),  np.searchsorted(self.sunk_wnd_ends, end)
+        #idx_s, idx_e = np.where(self.wnd_starts==start)[0], np.where(self.wnd_ends==end)[0]+1
+        #if idx_e <= idx_s: idx_e = idx_s+1
+        #s_idx_s, s_idx_e = np.searchsorted(self.sunk_wnd_starts, start),  np.searchsorted(self.sunk_wnd_ends, end)+1
+        #if s_idx_e <= s_idx_s: s_idx_e = s_idx_s+1
+        
         xs = (self.wnd_starts[idx_s:idx_e]+self.wnd_ends[idx_s:idx_e])/2.0
         s_xs = (self.sunk_wnd_starts[s_idx_s:s_idx_e]+self.sunk_wnd_ends[s_idx_s:s_idx_e])/2.0
-        print "shapes", X.shape, Xs.shape
+        #print "shapes", X.shape, Xs.shape
 
         for i in xrange(X.shape[0]):
             axarr[2,1].plot(xs, X[i,:])
@@ -267,16 +337,20 @@ class genotyper:
         
     def get_gt_matrix(self, contig, start, end, vb=False):
         assert contig == self.contig
+        
         start_idx = np.searchsorted(self.wnd_starts, start)
         end_idx = np.searchsorted(self.wnd_ends, end)
+        
+        print "BEGIN:", start_idx, end_idx 
+        if end_idx<=start_idx:
+            end_idx = start_idx+1
+        elif end_idx-start_idx>1:
+            start_idx+=1
+        print "END:", start_idx, end_idx 
 
         X = self.cp_matrix[:,start_idx:end_idx]
-        if vb:
-            print "idxs:", start_idx, end_idx
-            print X
         
-        X[np.isnan(X)] = 0
-        return X
+        return X, start_idx, end_idx
     
     def get_sunk_gt_matrix(self, contig, start, end, vb=False):
         assert contig == self.contig
@@ -284,18 +358,21 @@ class genotyper:
         start_idx = np.searchsorted(self.sunk_wnd_starts, start)
         end_idx = np.searchsorted(self.sunk_wnd_ends, end)
         
+        print "BEGIN:", start_idx, end_idx 
+        if end_idx<=start_idx:
+            end_idx = start_idx+1
+        elif end_idx-start_idx>1:
+            start_idx+=1
+        print "END:", start_idx, end_idx 
+
         X = self.sunk_cp_matrix[:,start_idx:end_idx]
-        if vb:
-            print "idxs:", start_idx, end_idx
-            print X
-        
-        X[np.isnan(X)] = 0
-        return X
+         
+        return X, start_idx, end_idx
     
     def get_gt_matrix_mu(self, contig, start, end):
         assert contig == self.contig
         start_idx = np.searchsorted(self.wnd_starts, start)
-        end_idx = np.searchsorted(self.wnd_ends, end)
+        end_idx = np.searchsorted(self.wnd_ends, end)+1
         X = self.cp_matrix[:,start_idx:end_idx]
         
         return X
@@ -363,7 +440,9 @@ class genotyper:
         idx = np.argmin(bics)
         gmm = gmms[idx]
         labels = all_labels[idx]
-        return gmm, labels, Z, [params, bics]
+        
+        return GMM_gt(X, gmm, labels, Z, params, bics)
+        #return gmm, labels, Z, [params, bics]
         #return gmm, labels, Z, [[len(init_mus)], [ic]]
     
     def initialize(self, X, grps):

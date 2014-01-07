@@ -261,45 +261,6 @@ class genotyper:
         fig.savefig("%s/%s-%d-%d.png"%(self.plot_dir, chr, start, end))
         plt.close()
 
-
-    def _plot(self, X, labels, chr, start, end):
-
-        cps = np.mean(X, 1)
-        print cps.shape
-        plt.rc('grid',color='0.75',linestyle='l',linewidth='0.1')
-        fig = plt.figure()
-        fig.set_figwidth(8)
-        fig.set_figheight(6)
-        axescolor  = '#f6f6f6'
-        h_margin = 0.05
-        v_margin = 0.05
-        plot_height=1-2*v_margin
-        plot_width=1-2*h_margin
-        bottom=1-h_margin-plot_height
-        plot_rect=[h_margin,bottom,plot_width,plot_height]
-
-        hist_ax = fig.add_axes(plot_rect)
-        n, bins, patches = hist_ax.hist(cps,alpha=.9,ec='none',normed=1,bins=len(cps)/20)
-        
-        uniq_labels = list(Set(labels))
-        n_labels = len(uniq_labels)
-        
-        G_x=np.arange(0,max(cps)+2,.1)
-        
-        for i, label in enumerate(uniq_labels):
-
-            c=cm.hsv(float(i)/n_labels,1)
-            mu = np.mean(cps[labels==label])
-            var = np.var(cps[labels==label])
-            frac = np.sum(labels==label)/float(len(labels)) 
-            n_in_label = np.sum(labels==label)
-            G_y = mlab.normpdf(G_x, mu, var**.5)*frac
-            hist_ax.plot(G_x,G_y,color=c)
-            hist_ax.plot(mu,-.001,"^",ms=10,alpha=.7,color=c)
-            print "%d cluster at %f"%(n_in_label, mu) 
-        
-        fig.savefig("%s/%s-%d-%d.png"%(self.plot_dir, chr, start, end))
-        plt.close()
         
     def get_gt_matrix(self, contig, start, end, vb=False):
         assert contig == self.contig

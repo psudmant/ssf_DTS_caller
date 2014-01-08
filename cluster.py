@@ -20,6 +20,8 @@ import math
 
 from sets import Set
 
+from genotyper import genotyper
+
 class callset_table(object):
     """
         *chr
@@ -146,7 +148,7 @@ class indiv_cluster_calls:
         return curr_dCGHs
 
 
-    def resolve_overlapping_clusters(self, ll_cutoff, tbx_dups, indiv_DTS, ref_DTSs, dCGHs, verbose=False, min_overlapping=2):
+    def resolve_overlapping_clusters(self, ll_cutoff, tbx_dups, indiv_id, indiv_DTS, ref_DTSs, dCGHs, gglob_dir, out_viz_dir, verbose=False, min_overlapping=2):
         """
         resolve overlapping clusters into individual calls 
         let the calls have likelihoods
@@ -166,7 +168,10 @@ class indiv_cluster_calls:
             ref_cps = {}
             for ref, refDTS in ref_DTSs.iteritems():
                 ref_cps[ref] = refDTS.get_cps_by_chr(chr) 
-                
+
+
+            g = genotyper(chr, gglob_dir=gglob_dir, plot_dir=out_viz_dir) 
+
             curr_dCGHs = self.get_curr_chr_dCGHs(chr, dCGHs)
             wnd_starts, wnd_ends = indiv_DTS.get_wnds_by_chr(chr)
 
@@ -180,49 +185,41 @@ class indiv_cluster_calls:
                                                                  min_overlapping=min_overlapping) 
                 
                 if len(resolved_calls) == 0: continue
-                """
-                now take all these resolved calls,  
-                assume medians are the breakpoint
-                and cluster those that STILL overlap (shoudln't be a ton...?)  
+                
+                variable_clusts = []
+                for clust in resolved_calls:
+                    """
+                    now take all these resolved calls,  
+                    and genotype to ensure this seg is var
+                    """
+                    d = self.get_delta(clust, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps, ref_cps)
 
-                if min(overlap_cluster.all_starts)>1545000 and min(overlap_cluster.all_starts)<1625000:
-                    self.plot_call(resolved_calls, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps)
-                    #overlappilf.get_final_call(resolved_calls)
-                    raw_input()
-                """
-
-                overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls)
+                    if d > 1.0:
+                        variable_clusts.append(clust)
+                    else:
+                        X, idx_s, idx_e = g.get_gt_matrix(chr, clust.get_med_start(), clust.get_med_end())
+                        gX = g.GMM_genotype(X)
+                        if gX.gmm.n_components>1 and gX.is_var(indiv_id, g):
+                            variable_clusts.append(clust)
+                p=True
+                if min(overlap_cluster.all_starts)>14454554 and min(overlap_cluster.all_starts)<14933135:
+                    p=True
+                
+                ## SHOULD TEST THEM BEFORE I CHECK FOR OVERLAPPING!
+                overlapping_call_clusts = get_overlapping_call_clusts(variable_clusts)
 
                 for clust in overlapping_call_clusts:
                     final_call = self.get_final_call(clust)
-                    """
-                    THERE IS A PROBLEM HERE!
-                    what if everyone is 4 and this guy is 2? no, not good, 
-                    need to consider the DELTA
 
-                    OK, so, basically here, need to do a mini genotypuing
-                    ******************
-                    *****************
-                    **************
-                    
-                    NOT how it should be below, jus ta test
-                    """
-                    d = self.get_delta(final_call, clust, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps, ref_cps)
-                    if final_call.length>100000:
-                        if d>0.5: 
-                            final_calls += [final_call]
-                    else:        
-                        final_calls += [final_call]
-                    """
-                    if not self.filter_call_by_size_cp(final_call, indiv_cps, wnd_starts, wnd_ends):
-                        final_calls += [final_call]
+                    f_len = len(final_calls)
+                    if p:
+                        print len(final_calls) > f_len
                         self.plot_call(clust, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps, ref_cps)
-                        self.get_delta(final_call, clust, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps, ref_cps)
                         raw_input()
-                    """
 
                 """
-                self.plot_call(resolved_calls, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps)
+                if min(overlap_cluster.all_starts)>14454554 and min(overlap_cluster.all_starts)<14933135:
+                self.plot_call(clust, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps, ref_cps)
                 raw_input()
                 """
                 #overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls, flatten = True)
@@ -257,15 +254,14 @@ class indiv_cluster_calls:
         f_call = simple_call(contig, mn, mx, ref_indivs, resolved_calls)
         return f_call
 
-    def get_delta(self, final_call, resolved_calls, wnd_starts, wnd_ends, dCGHs, indiv_cps, ref_cps):
-
-        w_s, w_e = np.searchsorted(wnd_starts,final_call.start), np.searchsorted(wnd_ends,final_call.end)
+    def get_delta(self, call_clust, wnd_starts, wnd_ends, dCGHs, indiv_cps, ref_cps):
         
-        ref_indivs = []
-        for call in resolved_calls:
-            ref_indivs+=call.ref_indivs
-
+        start, end = call_clust.get_med_start(), call_clust.get_med_end()
+        w_s, w_e = np.searchsorted(wnd_starts, start), np.searchsorted(wnd_ends, end)
+        
+        ref_indivs = call_clust.ref_indivs
         ref_indivs=list(Set(ref_indivs))
+
         ds = []
         for ref in ref_indivs:
             d = np.mean(indiv_cps[w_s:w_e]-ref_cps[ref][w_s:w_e])
@@ -275,7 +271,7 @@ class indiv_cluster_calls:
         #print ds, np.mean(np.absolute(np.array(ds))), np.median(np.absolute(np.array(ds))) 
         
 
-    def plot_call(self, resolved_calls, wnd_starts, wnd_ends, dCGHs, indiv_cps, ref_cps):
+    def plot_call(self, resolved_calls, wnd_starts, wnd_ends, dCGHs, indiv_cps, ref_cps, fn_out="test.pdf"):
         
         """
         choose the call that maximizes the delta between the outside windows and the inside windows
@@ -390,7 +386,7 @@ class indiv_cluster_calls:
         axes[0,1].set_xlabel("transformed_data")
         #axes[0,1].set_yscale("log")
         axes[1,1].set_xlabel("cp")
-        plt.savefig('test.pdf')
+        plt.savefig(fn_out)
         plt.gcf().clear()
         
     
@@ -898,6 +894,38 @@ class call_cluster(object):
     
     def get_min_max_start_end(self):
         return min(self.starts), max(self.ends)
+
+    def frac_overlap(self, i, j):
+        si, ei = self.starts[i],  self.ends[i]
+        sj, ej = self.starts[j],  self.ends[j]
+
+        if not (si < ej and sj < ei): 
+            return 0   
+
+        overlap = min(ei,ej) - max(si, sj)
+        return min(float(overlap)/(ei-si), 
+                   float(overlap)/(ej-sj))
+    
+    def cluster_by_recip_overlap(self, cutoff):
+        l = len(self.calls)
+        mat = np.zeros((l,l))
+
+        for i in xrange(l):
+            for j in xrange(l):
+                mat[i,j] = 1-(self.frac_overlap(i,j))
+        
+        mat=1.-dist.squareform( (1-mat) * (np.diag(np.repeat(1,l),0) -1) * -1)
+        Z = hclust.linkage(mat, method='complete')
+        grps = hclust.fcluster(Z, cutoff, criterion='distance')
+        
+        new_groups = []
+        for grp in np.unique(grps):
+            new_group = call_cluster()
+            for idx in np.where(grps==grp)[0]:
+                new_group.add(self.calls[idx])
+            new_groups.append(new_group)
+
+        return new_groups
         
 class cluster_callsets(object):
     """
@@ -914,27 +942,32 @@ class cluster_callsets(object):
         self.callset_table.filter_by_chr(self.contig)
     
     def get_genotypable_loci(self, total_subsets, subset):
-        overlapping_calls, n = self.get_overlapping_calls()
+        overlapping_call_groups, n = self.get_overlapping_calls()
         print >>stderr, "%d overlapping calls"%n
-        return self.generate_call_coordinates(overlapping_calls, total_subsets, subset)
+        return self.generate_call_coordinates(overlapping_call_groups, total_subsets, subset)
         """
         want to remove calls that are in FEW individuals, and WAY different
         """
         #for call in overlapping_calls:
         #    print "chr20", call.get_min_max_start_end(), len(call.calls), call.lengths
 
-    def generate_call_coordinates(self,calls, total_subsets, subset):
+    def generate_call_coordinates(self, overlap_call_groups, total_subsets, subset):
         
-        l = len(calls)
-        calls_to_assess = []
+        l = len(overlap_call_groups)
+        calls_groups_to_assess = []
 
         i=subset
         while i<l:
-            calls_to_assess.append(calls[i])
+            calls_groups_to_assess.append(overlap_call_groups[i])
             i+=total_subsets
 
-        for call in calls_to_assess:
-            yield call.get_min_max_start_end()
+        for call_group in calls_groups_to_assess:
+            #now, iterate through the calls
+            if len(call_group.calls)==1:
+                yield call_group
+            else:
+                for c in call_group.cluster_by_recip_overlap(0.85):
+                    yield c
 
 
     def get_overlapping_calls(self):

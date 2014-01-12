@@ -12,6 +12,8 @@ from get_windowed_variance import get_windowed_variance
 import genotyper as gt
 
 
+
+
 if __name__=='__main__':
 
     opts = OptionParser()
@@ -38,10 +40,47 @@ if __name__=='__main__':
     tbx_dups = pysam.Tabixfile(o.fn_dup_tabix)
     callset_clust = cluster.cluster_callsets(o.fn_call_table, contig)
     g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir)
+    F_gt = open(o.fn_gt_out,'w')
+    F_call = open(o.fn_call_out,'w')
     
     """
-        HERE, these shoudl be recip overlap too
-        ALSO, you may need to refine them?
+    iterate over lists of overlapping calls
+    each element in the list is a recip overlap cluster
     """
-    for c in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
-        gt.get_best_gt(c, contig, g)
+    g.setup_output(F_gt)
+    k=-1
+    for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
+        """
+        2 cases
+        1. there is one call in the cluster - simply output the call w/ genotypes
+        2. the region is more complex
+        """
+        k+=1
+        if k%100==0: print "%d genotypes evaluated..."%k
+
+        if len(overlapping_call_clusts) == 1:
+            c = overlapping_call_clusts[0]
+            start, end = c.get_med_start_end()
+            gt.output(c, g, contig, start, end, F_gt, F_call)  
+            #if len(overlapping_call_clusts[0].calls) == 1:
+            #    print "1 clust, 1 call - genotype, and output"
+            #else:
+            #    print "1 clust, %d calls - get best genotype, and output"%len(overlapping_call_clusts[0].calls)
+        else:
+            continue
+            #c = gt.test_correlation(overlapping_call_clusts, g, contig)
+            #s_e, CNV_s_e, cnv_segs_by_indiv, c, v_calls, non_adj = gt.merge_correlated_calls(overlapping_call_clusts, g, contig)
+            #s_e, CNV_s_e, cnv_segs_by_indiv, c, v_calls, non_adj = gt.(overlapping_call_clusts, g, contig)
+            if len(CNV_s_e)<=1 or non_adj:
+                print "output individual segs"
+            else:
+                """
+                a more complex set of overlapping calls
+                """
+                cluster.cluster_callsets.plot(overlapping_call_clusts, './test/', g, c, s_e, CNV_s_e, v_calls, cnv_segs_by_indiv)
+            """
+            CLUSTER ADJACENT CALLS W/ HIGH correlation coefficients!
+            """
+            print "X"
+            
+        #gt.get_best_gt(c, contig, g)

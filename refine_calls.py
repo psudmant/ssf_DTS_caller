@@ -50,11 +50,14 @@ if __name__=="__main__":
     opts.add_option('', '--min_wnd_call_size', dest='min_wnds', type=int, default=2)
     opts.add_option('', '--max_callsize', dest='max_callsize', type=int, default=200000)
     opts.add_option('', '--segdups', dest='fn_seg_dups')
-    opts.add_option('', '--min_overlapping_calls', dest='min_overlapping_calls', type=int, default=2)
+    opts.add_option('', '--min_overlapping_calls', dest='min_overlapping_calls', type=int, default=3)
     opts.add_option('', '--single_window_cutoff', dest='single_window_cutoff', type=float, default=1.0)
     opts.add_option('', '--limit_to_chr', dest='limit_to_chr', default=None)
     opts.add_option('', '--indiv_DTS', dest='fn_indiv_DTS', default=None)
     opts.add_option('', '--ref_DTS', dest='fn_ref_DTS', default=None)
+    
+    opts.add_option('', '--gglob_dir', dest='gglob_dir', default=None)
+    opts.add_option('', '--out_viz_dir', dest='viz_dir', default="./")
      
     opts.add_option('', '--contigs', dest='fn_contigs', default=None)
     opts.add_option('', '--window_size', dest='window_size', type=int, default=None)
@@ -66,12 +69,19 @@ if __name__=="__main__":
     (o, args) = opts .parse_args()
     
     indiv_DTS = wnd_cp_indiv(o.fn_indiv_DTS, o.fn_contigs, o.window_size) 
+    indiv_id = o.fn_indiv_DTS.split("/")[-1].replace("500_bp_","")
+
+    ref_DTSs = {}
     dCGHs = {}
     for fn_ref in o.fn_ref_DTS.split(":"):
         dCGHs[fn_ref.split("/")[-1].replace("500_bp_","")] = dCGH(o.fn_indiv_DTS, 
                                                                   fn_ref,
                                                                   o.fn_contigs,
                                                                   o.window_size)
+        
+        ref_DTSs[fn_ref.split("/")[-1].replace("500_bp_","")] = wnd_cp_indiv(fn_ref, 
+                                                                             o.fn_contigs, 
+                                                                             o.window_size) 
         
     call_table = cluster.indiv_callset_table(o.fn_call_table) 
     
@@ -92,10 +102,14 @@ if __name__=="__main__":
     name = o.fn_call_table.split("/")[-1].split(".")[0]
     call_clusterer = cluster.indiv_cluster_calls(call_table)
     call_clusterer.output_overlap_clusters(o.fn_out_indiv_calls_bed, name)
-    final_calls = call_clusterer.resolve_overlapping_clusters(-6, 
+    final_calls = call_clusterer.resolve_overlapping_clusters(-3, 
                                                               tbx_dups,
+                                                              indiv_id,
                                                               indiv_DTS,
+                                                              ref_DTSs,
                                                               dCGHs,
+                                                              o.gglob_dir,
+                                                              o.viz_dir,
                                                               verbose=False, 
                                                               min_overlapping=o.min_overlapping_calls)
 

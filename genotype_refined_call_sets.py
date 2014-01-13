@@ -56,21 +56,21 @@ if __name__=='__main__':
         2. the region is more complex
         """
         k+=1
+
         if k%100==0: print "%d genotypes evaluated..."%k
 
         if len(overlapping_call_clusts) == 1:
+            continue
             c = overlapping_call_clusts[0]
             start, end = c.get_med_start_end()
-            gt.output(c, g, contig, start, end, F_gt, F_call)  
-            #if len(overlapping_call_clusts[0].calls) == 1:
-            #    print "1 clust, 1 call - genotype, and output"
-            #else:
-            #    print "1 clust, %d calls - get best genotype, and output"%len(overlapping_call_clusts[0].calls)
+            gt.output(c, g, contig, start, end, F_gt, F_call, plot=True)  
         else:
+
+            s_e, CNV_s_e, cnv_segs_by_indiv, c, v_calls, non_adj = gt.(overlapping_call_clusts, g, contig)
+
             continue
             #c = gt.test_correlation(overlapping_call_clusts, g, contig)
             #s_e, CNV_s_e, cnv_segs_by_indiv, c, v_calls, non_adj = gt.merge_correlated_calls(overlapping_call_clusts, g, contig)
-            #s_e, CNV_s_e, cnv_segs_by_indiv, c, v_calls, non_adj = gt.(overlapping_call_clusts, g, contig)
             if len(CNV_s_e)<=1 or non_adj:
                 print "output individual segs"
             else:
@@ -84,3 +84,6 @@ if __name__=='__main__':
             print "X"
             
         #gt.get_best_gt(c, contig, g)
+
+    F_gt.close()
+    F_call.close()

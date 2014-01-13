@@ -2,7 +2,6 @@ import glob
 from sys import stderr
 import numpy as np
 
-
 import time
 import matplotlib.pyplot as plt
 import matplotlib.colors as mCols
@@ -13,7 +12,6 @@ import matplotlib.mlab as mlab
 from sklearn import cluster 
 from sklearn import metrics
 from sklearn import mixture
-
 
 from sets import Set
 
@@ -32,7 +30,6 @@ import cluster as m_cluster
 from scipy.stats.mstats import mode
 
 import IPython
-
 
 
 class call:
@@ -329,7 +326,7 @@ class GMM_gt(object):
     def get_gts_by_indiv(self):
         
         cp_2_thresh=1.0
-        m = mode(self.labels)[0]
+        mode_label = int(mode(self.labels)[0][0])
         
         label_to_mu = {}
         mu_to_labels = {}
@@ -372,9 +369,22 @@ class GMM_gt(object):
         
         ## ensure no -1s
         while min(labels_to_gt.values())<0:
+            print "<0's detected..."
             new_labels_to_gt = {}
             for l, gt in labels_to_gt.iteritems():
                 new_labels_to_gt[l] = gt+1
+            labels_to_gt = new_labels_to_gt
+       
+        ##correct for odd major alleles out of HWE 
+        if (labels_to_gt[mode_label] %2 == 1) and  np.sum(all_labels==mode_label) >= .5*(all_labels.shape[0]):
+            d=0
+            if label_to_mu[mode_label]-labels_to_gt[mode_label]>0 or min(labels_to_gt.values())>0:
+                d=1
+            else:
+                d=-1
+            new_labels_to_gt = {}
+            for l, gt in labels_to_gt.iteritems():
+                new_labels_to_gt[l] = gt+d
             labels_to_gt = new_labels_to_gt
         
         # finally double check the cps make sense...
@@ -435,6 +445,12 @@ def output(call_clust, g, contig, s, e, F_gt, F_call, include_indivs=None, plot=
 
     F_call.write("%s\t%d\t%d\n"%(contig, s, e))
     g.output(F_gt, gX, contig, s, e)
+
+    if plot:
+        Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
+        gXs = g.GMM_genotype(Xs, include_indivs)
+
+        g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./test/%s_%d_%d.pdf"%(contig, s, e))
 
 
 class genotyper:

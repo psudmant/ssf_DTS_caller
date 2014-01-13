@@ -129,13 +129,10 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff):
     return s_e_tups, original_c
 
 
-def merge_correlated_calls(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
-    
+def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
     """
-    take overlapping call clusts and determine the correlated segments
-    if a whole block is correlated, it represents a single locus call
+    First chop up into ALL constituate parts
     """
-        
     all_starts_ends = []
     min_s, max_e = 9e9, -1
     for clust in overlapping_call_clusts: 
@@ -145,10 +142,54 @@ def merge_correlated_calls(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
         all_starts_ends.append(s)
         all_starts_ends.append(e)
     
+    #merge correllated calls
     s_e_segs, c = get_correlated_segments(all_starts_ends, g, contig, r_cutoff)
-    print s_e_segs
+    
+    CNV_segs, CNV_gXs = filter_invariant_segs(s_e_segs, g, contig) 
+
     """
-    1. remove crappy segs
+    get variant chunks PER individual
+    """
+
+    cnv_segs_by_indiv = {}
+    for i, indiv in enumerate(g.indivs):
+        indiv_cnv_segs = []
+        for i, gX in enumerate(CNV_gXs):
+            seg = list(CNV_segs[i])
+            if gX.is_var(indiv, g, force_not_mode=True):
+                if len(indiv_cnv_segs)>0 and seg[0] == indiv_cnv_segs[-1][1]: 
+                    indiv_cnv_segs[-1][1] = seg[1]
+                else:
+                    indiv_cnv_segs.append(seg)
+        cnv_segs_by_indiv[indiv] = indiv_cnv_segs
+    
+    """
+    FINALLY, if calls don't touch, or, there's just one call, return 
+    """
+
+    if len(CNV_segs) <= 1 or non_adjacent(CNV_segs):
+        indivs_to_assess = [None for i in s_e_segs]
+        exclude_loci = [None for i in s_e_segs]
+        return s_e_segs, indivs_to_assess, exclude_loci, True
+        #return s_e_segs, CNV_segs, cnv_segs_by_indiv, c, v_calls, True
+    else:
+        m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./test/", g, c, [min_s, max_e], CNV_segs, cnv_segs_by_indiv)  
+        for seg in CNV_segs:
+            s, e = seg
+            #X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
+            #gX = g.GMM_genotype(X)
+            #Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
+            #gXs = g.GMM_genotype(Xs)
+            #g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./test/%d_%d_x.pdf"%(s+1, e))
+        indivs_to_assess = [None for i in s_e_segs]
+        exclude_loci = [None for i in s_e_segs]
+        return s_e_segs, indivs_to_assess, exclude_loci, False
+        #return s_e_segs, CNV_segs, cnv_segs_by_indiv, c, v_calls, False
+   
+def filter_invariant_segs(s_e_segs, g, contig):
+
+    """
+       remove crappy segs
        filter the segs to be only regions that are CNV
        AND
        merge adjacent calls with equal genotypes (technically the above should handle
@@ -171,51 +212,8 @@ def merge_correlated_calls(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
           
         prev_labels = gX.labels
     
-    """
-    remove calls (from all the clusts) where there are no CNV LOCI   
-    v_calls = []
-    for clust in overlapping_call_clusts:
-        s, e =  clust.get_med_start_end()
-        if overlap(s, e, CNV_segs):
-            v_calls.append(clust)
-    """
-   
-    cnv_segs_by_indiv = {}
-    for i, indiv in enumerate(g.indivs):
-        indiv_cnv_segs = []
-        for i, gX in enumerate(CNV_gXs):
-            seg = list(CNV_segs[i])
-            if gX.is_var(indiv, g, force_not_mode=True):
-                if len(indiv_cnv_segs)>0 and seg[0] == indiv_cnv_segs[-1][1]: 
-                    indiv_cnv_segs[-1][1] = seg[1]
-                else:
-                    indiv_cnv_segs.append(seg)
-        cnv_segs_by_indiv[indiv] = indiv_cnv_segs
+    return CNV_segs, CNV_gXs        
 
-    """
-    OK, now, get all the individual calls out of this and quickly recluster
-    
-    now - all these calls are the genotypes, so output
-    region 1 - gts of indivs w/ that call, and then others, obviously don't have it
-    region 2 - ditto 
-    
-    """
-    
-    """
-    return a set of calls
-    """
-
-    if len(CNV_segs) <= 1 or non_adjacent(CNV_segs):
-        return s_e_segs, CNV_segs, cnv_segs_by_indiv, c, v_calls, True
-    else:
-        for seg in CNV_segs:
-            s, e = seg
-            X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
-            gX = g.GMM_genotype(X)
-            Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
-            gXs = g.GMM_genotype(Xs)
-            g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./test/%d_%d_x.pdf"%(s+1, e))
-        return s_e_segs, CNV_segs, cnv_segs_by_indiv, c, v_calls, False
     
 def overlap(s, e, segs):
     for s_e in segs: 
@@ -330,23 +328,24 @@ class GMM_gt(object):
         
         label_to_mu = {}
         mu_to_labels = {}
+        indiv_labels = np.array(self.labels)
 
-        all_labels = []
+        all_uniq_labels = []
         all_mus = []
         
         for l in np.unique(self.labels):
             
             label_to_mu[l] = np.mean(self.mus[self.labels==l])
             mu_to_labels[np.mean(self.mus[self.labels==l])] = l
-            all_labels.append(l)
+            all_uniq_labels.append(l)
             all_mus.append(np.mean(self.mus[self.labels==l]))
             
-        all_labels = np.array(all_labels)
+        all_uniq_labels = np.array(all_uniq_labels)
         all_mus = np.array(all_mus)
         
         mu_args = np.argsort(all_mus) 
           
-        ordered_labels = all_labels[mu_args]
+        ordered_labels = all_uniq_labels[mu_args]
         ordered_mus = all_mus[mu_args] 
         d_from_2 = np.absolute(ordered_mus-2.0)
         
@@ -376,9 +375,9 @@ class GMM_gt(object):
             labels_to_gt = new_labels_to_gt
        
         ##correct for odd major alleles out of HWE 
-        if (labels_to_gt[mode_label] %2 == 1) and  np.sum(all_labels==mode_label) >= .5*(all_labels.shape[0]):
+        if (labels_to_gt[mode_label] %2 == 1) and np.sum(indiv_labels==mode_label) >= .5*(indiv_labels.shape[0]):
             d=0
-            if label_to_mu[mode_label]-labels_to_gt[mode_label]>0 or min(labels_to_gt.values())>0:
+            if label_to_mu[mode_label]-labels_to_gt[mode_label]>0 or min(labels_to_gt.values())==0:
                 d=1
             else:
                 d=-1
@@ -436,7 +435,7 @@ class GMM_gt(object):
         
         return False
         
-def output(call_clust, g, contig, s, e, F_gt, F_call, include_indivs=None, plot=False):
+def output(g, contig, s, e, F_gt, F_call, include_indivs=None, plot=False):
 
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs)
@@ -444,12 +443,12 @@ def output(call_clust, g, contig, s, e, F_gt, F_call, include_indivs=None, plot=
         return
 
     F_call.write("%s\t%d\t%d\n"%(contig, s, e))
-    g.output(F_gt, gX, contig, s, e)
+    g.output(F_gt, gX, contig, s, e, v=True)
 
     if plot:
+        print "plotting %s %d %d"%(contig, s, e)
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
         gXs = g.GMM_genotype(Xs, include_indivs)
-
         g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./test/%s_%d_%d.pdf"%(contig, s, e))
 
 
@@ -459,10 +458,10 @@ class genotyper:
         outstr = "contig\tstart\tend\t%s\n"%("\t".join(self.indivs))
         FOUT.write(outstr)
 
-    def output(self, FOUT, gX, contig, s, e):
+    def output(self, FOUT, gX, contig, s, e, v=False):
         
         outstr = "%s\t%d\t%d"%(contig, s, e)
-
+        print outstr
         gts_by_indiv = gX.get_gts_by_indiv()
         
         ordered_gts = []
@@ -471,8 +470,10 @@ class genotyper:
                 ordered_gts.append(gts_by_indiv[indiv])
             else:
                 ordered_gts.append(-1)
-        
         outstr = "%s\t%s\n"%(outstr, "\t".join("%d"%gt for gt in ordered_gts))
+        if v:
+            print outstr
+
         FOUT.write(outstr)
     
     def init_on_indiv_DTS_files(self, **kwargs):
@@ -632,12 +633,12 @@ class genotyper:
         start_idx = np.searchsorted(self.sunk_wnd_starts, start)
         end_idx = np.searchsorted(self.sunk_wnd_ends, end)
         
-        print "BEGIN:", start_idx, end_idx 
+        #print "BEGIN:", start_idx, end_idx 
         if end_idx<=start_idx:
             end_idx = start_idx+1
         elif end_idx-start_idx>1:
             start_idx+=1
-        print "END:", start_idx, end_idx 
+        #print "END:", start_idx, end_idx 
 
         X = self.sunk_cp_matrix[:,start_idx:end_idx]
          

@@ -937,7 +937,7 @@ class cluster_callsets(object):
     """
     
     @classmethod
-    def plot(cls, overlapping_call_clusts, out_dir, g, c, s_es, CNV_s_e, v_calls, cnv_segs_by_indiv):
+    def plot(cls, overlapping_call_clusts, out_dir, g, c, s_es, CNV_s_e, cnv_segs_by_indiv):
          
         min_start = 9e9
         max_end = -1

@@ -63,17 +63,18 @@ if __name__=='__main__':
             continue
             c = overlapping_call_clusts[0]
             start, end = c.get_med_start_end()
-            gt.output(c, g, contig, start, end, F_gt, F_call, plot=True)  
+            gt.output(g, contig, start, end, F_gt, F_call, plot=False)  
         else:
-
-            s_e, CNV_s_e, cnv_segs_by_indiv, c, v_calls, non_adj = gt.(overlapping_call_clusts, g, contig)
-
-            continue
+            s_e_segs, include_indivs, exclude_loci, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig)
             #c = gt.test_correlation(overlapping_call_clusts, g, contig)
             #s_e, CNV_s_e, cnv_segs_by_indiv, c, v_calls, non_adj = gt.merge_correlated_calls(overlapping_call_clusts, g, contig)
-            if len(CNV_s_e)<=1 or non_adj:
-                print "output individual segs"
+            if len(s_e_segs)<=1 or non_adj:
+                continue
+                for s_e in s_e_segs:
+                    s,e = s_e
+                    gt.output(g, contig, s, e, F_gt, F_call, plot=False)  
             else:
+                continue
                 """
                 a more complex set of overlapping calls
                 """
@@ -81,7 +82,6 @@ if __name__=='__main__':
             """
             CLUSTER ADJACENT CALLS W/ HIGH correlation coefficients!
             """
-            print "X"
             
         #gt.get_best_gt(c, contig, g)
 

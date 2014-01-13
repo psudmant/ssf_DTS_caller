@@ -163,6 +163,14 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
                     indiv_cnv_segs.append(seg)
         cnv_segs_by_indiv[indiv] = indiv_cnv_segs
     
+    indivs_by_cnv_segs = {}
+    for indiv, cnv_segs in  cnv_segs_by_indiv.iteritems():
+        for s_e in cnv_segs:
+            s_e_tup = tuple(s_e)
+            if not s_e_tup in indivs_by_cnv_segs:
+                indivs_by_cnv_segs[s_e_tup] = []
+            indivs_by_cnv_segs[s_e_tup].append(indiv)
+    
     """
     FINALLY, if calls don't touch, or, there's just one call, return 
     """
@@ -170,20 +178,26 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
     if len(CNV_segs) <= 1 or non_adjacent(CNV_segs):
         indivs_to_assess = [None for i in s_e_segs]
         exclude_loci = [None for i in s_e_segs]
-        return s_e_segs, indivs_to_assess, exclude_loci, True
-        #return s_e_segs, CNV_segs, cnv_segs_by_indiv, c, v_calls, True
+        return s_e_segs, indivs_to_assess, True
     else:
-        m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./test/", g, c, [min_s, max_e], CNV_segs, cnv_segs_by_indiv)  
-        for seg in CNV_segs:
-            s, e = seg
-            #X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
-            #gX = g.GMM_genotype(X)
-            #Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
-            #gXs = g.GMM_genotype(Xs)
-            #g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./test/%d_%d_x.pdf"%(s+1, e))
-        indivs_to_assess = [None for i in s_e_segs]
-        exclude_loci = [None for i in s_e_segs]
-        return s_e_segs, indivs_to_assess, exclude_loci, False
+        m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
+
+        s_e_segs = []
+        indivs_to_assess = []
+        
+        for cnv_seg, indivs in indivs_by_cnv_segs.iteritems():
+            indivs = Set(g.indivs)   
+            s1, e1 = cnv_seg
+            for cnv_seg2, indivs2 in indivs_by_cnv_segs.iteritems():
+                s2, e2 = cnv_seg2
+                if cnv_seg != cnv_seg2 and overlap(s1, e1, s2, e2):
+                    indivs = indivs - Set(indivs2)
+            
+            s_e_segs.append(cnv_seg) 
+            indivs_to_assess.append(list(indivs))
+        
+        
+        return s_e_segs, indivs_to_assess, False
         #return s_e_segs, CNV_segs, cnv_segs_by_indiv, c, v_calls, False
    
 def filter_invariant_segs(s_e_segs, g, contig):
@@ -215,11 +229,9 @@ def filter_invariant_segs(s_e_segs, g, contig):
     return CNV_segs, CNV_gXs        
 
     
-def overlap(s, e, segs):
-    for s_e in segs: 
-        s_start, s_end = s_e
-        if (s<=s_end and s>=s_start) or (e>=s_start and e<=s_end):
-            return True
+def overlap(s1, e1, s2, e2):
+    if (s1<=e2 and s2<=e1):
+        return True
     return False
 
 def non_adjacent(CNV_segs):
@@ -420,6 +432,11 @@ class GMM_gt(object):
         
         delta = bic_r-self.min_bic+bic_l-self.min_bic
         return delta
+
+    def get_cp(self, indiv, g):
+        
+        idx = g.indivs.index(indiv_id)
+        
 
     def is_var(self, indiv_id, g, force_not_mode = False):
 

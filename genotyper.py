@@ -171,9 +171,6 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
                 indivs_by_cnv_segs[s_e_tup] = []
             indivs_by_cnv_segs[s_e_tup].append(indiv)
     
-    """
-    FINALLY, if calls don't touch, or, there's just one call, return 
-    """
 
     if len(CNV_segs) <= 1 or non_adjacent(CNV_segs):
         indivs_to_assess = [None for i in s_e_segs]
@@ -196,9 +193,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
             s_e_segs.append(cnv_seg) 
             indivs_to_assess.append(list(indivs))
         
-        
         return s_e_segs, indivs_to_assess, False
-        #return s_e_segs, CNV_segs, cnv_segs_by_indiv, c, v_calls, False
    
 def filter_invariant_segs(s_e_segs, g, contig):
 
@@ -698,14 +693,13 @@ class genotyper:
         """
          
         if include_indivs:
-            l = len_include_indivs
+            l = len(include_indivs)
             new_X = np.zeros(l, X.shape[1])
             
-            j = 0
-            for i in xrange(X.shape[0]):
-                if self.indivs[i] in include_indivs:
-                    new_X[j] = X[i] 
-                    j+=1
+            for i, indiv in enumerate(include_indivs):
+                j = self.indivs.index(indiv)
+                new_X[i] = X[j] 
+                
             X=new_X
                     
         mus = np.mean(X,1)
@@ -745,6 +739,7 @@ class genotyper:
         idx = np.argmin(bics)
         gmm = gmms[idx]
         labels = all_labels[idx]
+
         if include_indivs == None: 
             include_indivs = self.indivs
             

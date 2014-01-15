@@ -943,7 +943,7 @@ class cluster_callsets(object):
         max_end = -1
         j=0
         for call_clust in overlapping_call_clusts:
-            print "recip overlap cluster %d, contains %d calls"%(j, len(call_clust.starts))
+            #print "recip overlap cluster %d, contains %d calls"%(j, len(call_clust.starts))
             min_start = min(min_start, min(call_clust.starts))
             max_end = max(max_end, max(call_clust.ends))
             j+=1

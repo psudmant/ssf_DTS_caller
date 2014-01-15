@@ -42,12 +42,14 @@ if __name__=='__main__':
     g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir)
     F_gt = open(o.fn_gt_out,'w')
     F_call = open(o.fn_call_out,'w')
+    F_filt = open("%s.filter_inf"%o.fn_call_out,'w')
     
     """
     iterate over lists of overlapping calls
     each element in the list is a recip overlap cluster
     """
-    g.setup_output(F_gt)
+    do_plot = False
+    g.setup_output(F_gt, F_filt)
     k=-1
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
         """
@@ -60,24 +62,21 @@ if __name__=='__main__':
         if k%100==0: print "%d genotypes evaluated..."%k
 
         if len(overlapping_call_clusts) == 1:
-            continue
             c = overlapping_call_clusts[0]
             start, end = c.get_med_start_end()
-            gt.output(g, contig, start, end, F_gt, F_call, plot=False)  
+            gt.output(g, contig, start, end, F_gt, F_call, F_filt, plot=do_plot)  
         else:
             s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig)
             
             if len(s_e_segs)<=1 or non_adj:
-                continue
                 for s_e in s_e_segs:
                     s,e = s_e
-                    gt.output(g, contig, s, e, F_gt, F_call, plot=False)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, plot=do_plot)  
             else:
-
                 for i, s_e in enumerate(s_e_segs):
                     s,e = s_e
                     inc_indivs = include_indivs[i]
-                    gt.output(g, contig, s, e, F_gt, F_call, include_indivs=inc_indivs, plot=True)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, include_indivs=inc_indivs, plot=do_plot)  
 
     F_gt.close()
     F_call.close()

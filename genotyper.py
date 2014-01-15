@@ -182,16 +182,16 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
         s_e_segs = []
         indivs_to_assess = []
         
-        for cnv_seg, indivs in indivs_by_cnv_segs.iteritems():
-            indivs = Set(g.indivs)   
+        for cnv_seg, inds_called in indivs_by_cnv_segs.iteritems():
+            assess_indivs = Set(g.indivs)   
             s1, e1 = cnv_seg
             for cnv_seg2, indivs2 in indivs_by_cnv_segs.iteritems():
                 s2, e2 = cnv_seg2
                 if cnv_seg != cnv_seg2 and overlap(s1, e1, s2, e2):
-                    indivs = indivs - Set(indivs2)
+                    assess_indivs = assess_indivs - Set(indivs2)
             
             s_e_segs.append(cnv_seg) 
-            indivs_to_assess.append(list(indivs))
+            indivs_to_assess.append(list(assess_indivs))
         
         return s_e_segs, indivs_to_assess, False
    
@@ -327,33 +327,145 @@ class GMM_gt(object):
         self.indivs = indivs 
         self.best_idx = self.bics.index(self.min_bic) 
         self.n_clusts = self.params[self.best_idx]
+        
+        self.n_wnds = self.X.shape[1]
+
+        self.f_correct = None 
+        
+        #unique labels are the unique labels and uniq mus are the 
+        #mean of the self.mus for each label
+        
+        self.label_to_mu = {}
+        self.mu_to_labels = {}
+        self.label_to_std = {}
+        
+        self.all_uniq_labels = []
+        self.all_uniq_mus = []
+
+        for l in np.unique(self.labels):
+            self.label_to_mu[l] = np.mean(self.mus[self.labels==l])
+            self.label_to_std[l] = np.std(self.mus[self.labels==l])
+            self.mu_to_labels[np.mean(self.mus[self.labels==l])] = l
+            self.all_uniq_labels.append(l)
+            self.all_uniq_mus.append(np.mean(self.mus[self.labels==l]))
+
+        self.all_uniq_labels = np.array(self.all_uniq_labels)
+        self.all_uniq_mus = np.array(self.all_uniq_mus)
+         
+    def correct_order_proportion(self):
+        #wnd_proportion_dir
+        
+        sorted_mus = np.sort(self.all_uniq_mus)
+        labels = np.array(self.labels)
+        
+        t = 0 
+        p = 0
+        for i in xrange(sorted_mus.shape[0]-1):
+            mu_0 = sorted_mus[i]
+            l_0 = self.mu_to_labels[mu_0]
+            
+            mu_1 = sorted_mus[i+1]
+            l_1 = self.mu_to_labels[mu_1]
+
+            assert mu_0<mu_1
+            
+            wl_0 = np.where(labels==l_0)
+            wl_1 = np.where(labels==l_1)
+            t+=self.X.shape[1]
+            """
+            COULD traverse in...
+            """
+            #print self.X.shape
+            #print self.X[wl_0,:]
+            #print self.X[wl_1,:]
+            #print wl_0[0].shape, wl_1[0].shape
+            #print np.amax(self.X[wl_0,:], 1), np.amin(self.X[wl_1,:], 1)
+            p+=np.sum(np.amax(self.X[wl_0,:], 1)<np.amin(self.X[wl_1,:], 1))
+        
+        return float(p)/t
     
+    def get_min_z_dist(self):
+
+        min_z_dist = 9e9
+
+        sorted_mus = np.sort(self.all_uniq_mus)
+        labels = np.array(self.labels)
+        
+        delta = np.diff(sorted_mus)
+        std_lefts = []
+        std_rights = []
+
+        for i in xrange(sorted_mus.shape[0]-1):
+            mu_left = sorted_mus[i]
+            mu_right = sorted_mus[i+1]
+            
+            l_left = self.mu_to_labels[mu_left]
+            l_right = self.mu_to_labels[mu_right]
+            
+            std_left = max(1e-9, self.label_to_std[l_left])
+            std_right = max(1e-9, self.label_to_std[l_right])
+            
+            std_lefts.append(std_left)
+            std_rights.append(std_right)
+        
+        std_lefts = np.array(std_lefts)
+        std_rights = np.array(std_rights)
+
+        min_l = np.amin(np.absolute(delta/std_lefts)) 
+        min_r = np.amin(np.absolute(delta/std_rights)) 
+        
+        return min(min_l, min_r)
+
+
+    def fail_filter(self, mu_mu_min, frac_dir_min):
+
+        if self.f_correct == None: 
+            self.f_correct = self.correct_order_proportion()
+        
+        mean_mu_delta = self.get_mean_inter_mu_dist()
+        
+        if (mean_mu_delta < mu_mu_min) or (self.f_correct <= frac_dir_min):
+            return True
+
+        return False
+
+    def output_filter_data(self, F_filt, contig, s, e):
+        
+        if self.f_correct == None:
+            self.f_correct = self.correct_order_proportion()
+        mu_mu_d =  self.get_mean_inter_mu_dist()
+        max_mu_d = self.get_max_mu_d()
+        n_wnds = self.n_wnds
+        min_z = self.get_min_z_dist()
+        bic_delta = self.get_bic_delta() 
+        
+        F_filt.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format(contig, s, e, 
+                                                                         mu_mu_d, 
+                                                                         max_mu_d, 
+                                                                         self.f_correct,
+                                                                         min_z, 
+                                                                         n_wnds,
+                                                                         bic_delta))
+
+    def get_max_mu_d(self):
+        return np.amax(self.all_uniq_mus)-np.amin(self.all_uniq_mus)
+    
+    def get_mean_inter_mu_dist(self):
+        s_mus = np.sort(self.all_uniq_mus)
+        ds = np.diff(s_mus)
+        return np.mean(ds)
+
     def get_gts_by_indiv(self):
         
         cp_2_thresh=1.0
         mode_label = int(mode(self.labels)[0][0])
         
-        label_to_mu = {}
-        mu_to_labels = {}
         indiv_labels = np.array(self.labels)
-
-        all_uniq_labels = []
-        all_mus = []
         
-        for l in np.unique(self.labels):
-            
-            label_to_mu[l] = np.mean(self.mus[self.labels==l])
-            mu_to_labels[np.mean(self.mus[self.labels==l])] = l
-            all_uniq_labels.append(l)
-            all_mus.append(np.mean(self.mus[self.labels==l]))
-            
-        all_uniq_labels = np.array(all_uniq_labels)
-        all_mus = np.array(all_mus)
-        
-        mu_args = np.argsort(all_mus) 
+        mu_args = np.argsort(self.all_uniq_mus) 
           
-        ordered_labels = all_uniq_labels[mu_args]
-        ordered_mus = all_mus[mu_args] 
+        ordered_labels = self.all_uniq_labels[mu_args]
+        ordered_mus = self.all_uniq_mus[mu_args] 
         d_from_2 = np.absolute(ordered_mus-2.0)
         
         labels_to_gt = {}
@@ -384,7 +496,7 @@ class GMM_gt(object):
         ##correct for odd major alleles out of HWE 
         if (labels_to_gt[mode_label] %2 == 1) and np.sum(indiv_labels==mode_label) >= .5*(indiv_labels.shape[0]):
             d=0
-            if label_to_mu[mode_label]-labels_to_gt[mode_label]>0 or min(labels_to_gt.values())==0:
+            if self.label_to_mu[mode_label]-labels_to_gt[mode_label]>0 or min(labels_to_gt.values())==0:
                 d=1
             else:
                 d=-1
@@ -447,16 +559,18 @@ class GMM_gt(object):
         
         return False
         
-def output(g, contig, s, e, F_gt, F_call, include_indivs=None, plot=False):
+def output(g, contig, s, e, F_gt, F_call, F_filt, include_indivs=None, plot=False):
 
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs)
-    if gX.n_clusts == 1:
+    
+    if gX.n_clusts == 1 or gX.fail_filter(.5,.5):
         return
 
     F_call.write("%s\t%d\t%d\n"%(contig, s, e))
-    g.output(F_gt, gX, contig, s, e, v=True)
-
+    g.output(F_gt, gX, contig, s, e, v=False)
+    gX.output_filter_data(F_filt, contig, s, e)
+    
     if plot:
         print "plotting %s %d %d"%(contig, s, e)
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
@@ -466,14 +580,23 @@ def output(g, contig, s, e, F_gt, F_call, include_indivs=None, plot=False):
 
 class genotyper:
     
-    def setup_output(self, FOUT):
+    def setup_output(self, FOUT, FFILT):
         outstr = "contig\tstart\tend\t%s\n"%("\t".join(self.indivs))
         FOUT.write(outstr)
+
+        FFILT.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format("chr", 
+                                                                 "start", 
+                                                                 "end", 
+                                                                 "mu_mu_d", 
+                                                                 "max_mu_d", 
+                                                                 "f_correct_direction",
+                                                                 "min_z",
+                                                                 "wnd_size", 
+                                                                 "bic_delta"))
 
     def output(self, FOUT, gX, contig, s, e, v=False):
         
         outstr = "%s\t%d\t%d"%(contig, s, e)
-        print outstr
         gts_by_indiv = gX.get_gts_by_indiv()
         
         ordered_gts = []
@@ -694,7 +817,7 @@ class genotyper:
          
         if include_indivs:
             l = len(include_indivs)
-            new_X = np.zeros(l, X.shape[1])
+            new_X = np.zeros((l, X.shape[1]))
             
             for i, indiv in enumerate(include_indivs):
                 j = self.indivs.index(indiv)

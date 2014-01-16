@@ -575,7 +575,7 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, include_indivs=None, plot=Fals
         print "plotting %s %d %d"%(contig, s, e)
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
         gXs = g.GMM_genotype(Xs, include_indivs)
-        g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./test/%s_%d_%d.pdf"%(contig, s, e))
+        g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./plotting/test/%s_%d_%d.pdf"%(contig, s, e))
 
 
 class genotyper:

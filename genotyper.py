@@ -129,7 +129,7 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff):
     return s_e_tups, original_c
 
 
-def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
+def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65, plot=False):
     """
     First chop up into ALL constituate parts
     """
@@ -143,9 +143,11 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
         all_starts_ends.append(e)
     
     #merge correllated calls
+    r_cutoff=1.0
     s_e_segs, c = get_correlated_segments(all_starts_ends, g, contig, r_cutoff)
-    
     CNV_segs, CNV_gXs = filter_invariant_segs(s_e_segs, g, contig) 
+        
+    
 
     """
     get variant chunks PER individual
@@ -163,6 +165,9 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
                     indiv_cnv_segs.append(seg)
         cnv_segs_by_indiv[indiv] = indiv_cnv_segs
     
+    if plot: 
+        m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv)
+
     indivs_by_cnv_segs = {}
     for indiv, cnv_segs in  cnv_segs_by_indiv.iteritems():
         for s_e in cnv_segs:
@@ -171,14 +176,12 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65):
                 indivs_by_cnv_segs[s_e_tup] = []
             indivs_by_cnv_segs[s_e_tup].append(indiv)
     
-
     if len(CNV_segs) <= 1 or non_adjacent(CNV_segs):
         indivs_to_assess = [None for i in s_e_segs]
         exclude_loci = [None for i in s_e_segs]
         return s_e_segs, indivs_to_assess, True
     else:
-        m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
-
+        #m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
         s_e_segs = []
         indivs_to_assess = []
         
@@ -354,12 +357,13 @@ class GMM_gt(object):
          
     def correct_order_proportion(self):
         #wnd_proportion_dir
-        
         sorted_mus = np.sort(self.all_uniq_mus)
         labels = np.array(self.labels)
+        if len(sorted_mus)==1: return 0.0
         
         t = 0 
         p = 0
+        
         for i in xrange(sorted_mus.shape[0]-1):
             mu_0 = sorted_mus[i]
             l_0 = self.mu_to_labels[mu_0]
@@ -380,7 +384,10 @@ class GMM_gt(object):
             #print self.X[wl_1,:]
             #print wl_0[0].shape, wl_1[0].shape
             #print np.amax(self.X[wl_0,:], 1), np.amin(self.X[wl_1,:], 1)
-            p+=np.sum(np.amax(self.X[wl_0,:], 1)<np.amin(self.X[wl_1,:], 1))
+            s=np.sum(np.amax(self.X[wl_0,:], 1)<np.amin(self.X[wl_1,:], 1))
+            s2=np.sum(np.median(self.X[wl_0,:], 1)<np.median(self.X[wl_1,:], 1))
+            p+=s
+            #print "\t", mu_0, l_0, mu_1, l_1, s, self.X.shape[1], s/float(self.X.shape[1]),s2/float(self.X.shape[1])      
         
         return float(p)/t
     
@@ -422,39 +429,47 @@ class GMM_gt(object):
         if self.f_correct == None: 
             self.f_correct = self.correct_order_proportion()
         
-        mean_mu_delta = self.get_mean_inter_mu_dist()
+        #mean_mu_delta = self.get_mean_inter_mu_dist()
+        mu_mu_d, min_mu_d, max_mu_d = self.get_mean_min_max_inter_mu_dist()
         
-        if (mean_mu_delta < mu_mu_min) or (self.f_correct <= frac_dir_min):
+        if (max_mu_d < mu_mu_min):
             return True
 
         return False
+        
+        #if (self.f_correct <= frac_dir_min):
+        #    return True
+
 
     def output_filter_data(self, F_filt, contig, s, e):
         
         if self.f_correct == None:
             self.f_correct = self.correct_order_proportion()
-        mu_mu_d =  self.get_mean_inter_mu_dist()
-        max_mu_d = self.get_max_mu_d()
+        
+        mu_mu_d, min_mu_d, max_mu_d = self.get_mean_min_max_inter_mu_dist()
+
         n_wnds = self.n_wnds
-        min_z = self.get_min_z_dist()
+        #min_z = self.get_min_z_dist()
+        min_z = -1
         bic_delta = self.get_bic_delta() 
         
-        F_filt.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format(contig, s, e, 
+        F_filt.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\n".format(contig, s, e, 
                                                                          mu_mu_d, 
                                                                          max_mu_d, 
+                                                                         min_mu_d, 
                                                                          self.f_correct,
                                                                          min_z, 
                                                                          n_wnds,
                                                                          bic_delta))
-
-    def get_max_mu_d(self):
-        return np.amax(self.all_uniq_mus)-np.amin(self.all_uniq_mus)
     
-    def get_mean_inter_mu_dist(self):
+    def get_mean_min_max_inter_mu_dist(self):
         s_mus = np.sort(self.all_uniq_mus)
         ds = np.diff(s_mus)
-        return np.mean(ds)
+        if ds.shape[0] == 0:
+            return 0, 0, 0
 
+        return np.mean(ds), np.amin(ds), np.amax(ds) 
+        
     def get_gts_by_indiv(self):
         
         cp_2_thresh=1.0
@@ -564,6 +579,7 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, include_indivs=None, plot=Fals
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs)
     
+    print contig, s, e, gX.n_clusts, gX.fail_filter(.5,.5)
     if gX.n_clusts == 1 or gX.fail_filter(.5,.5):
         return
 
@@ -833,7 +849,7 @@ class genotyper:
         params, bics, gmms, all_labels = [], [], [], []
         
         prev_grps = np.array([])
-        for k in np.arange(.2, 0.7,  0.01):
+        for k in np.arange(.2, 0.7,  0.001):
             grps = hclust.fcluster(Z, k, criterion='distance')
             if np.all(grps == prev_grps): continue
 

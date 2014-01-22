@@ -892,28 +892,34 @@ class call_cluster(object):
 
 
 
-    def frac_overlap(self, i, j, max_dif=-1):
+    def frac_overlap(self, i, j, max_dif=-1, max_frac_uniq=-1):
         si, ei = self.starts[i],  self.ends[i]
         sj, ej = self.starts[j],  self.ends[j]
 
         if not (si < ej and sj < ei): 
             return 0   
 
-        overlap = min(ei,ej) - max(si, sj)
+        o = min(ei,ej) - max(si, sj)
         
-        if max_dif!=-1 and max((ei-si)-overlap, (ej-sj)-overlap) > max_dif:
+        if max_dif!=-1 and max((ei-si)-o, (ej-sj)-o) > max_dif:
+            return 0
+        
+        li=float(ei-si)
+        lj=float(ej-sj)
+        
+        if max_frac_uniq!=-1 and max(1-(o/li), 1-(o/lj)) > max_frac_uniq:
             return 0
 
-        return min(float(overlap)/(ei-si), 
-                   float(overlap)/(ej-sj))
+        return min(float(o)/(ei-si), 
+                   float(o)/(ej-sj))
     
-    def cluster_by_recip_overlap(self, cutoff, max_dif=-1):
+    def cluster_by_recip_overlap(self, cutoff, max_dif=-1, max_frac_uniq=-1):
         l = len(self.calls)
         mat = np.zeros((l,l))
 
         for i in xrange(l):
             for j in xrange(l):
-                mat[i,j] = 1-(self.frac_overlap(i,j,max_dif))
+                mat[i,j] = 1-(self.frac_overlap(i,j, max_dif, max_frac_uniq))
         
         mat=1.-dist.squareform( (1-mat) * (np.diag(np.repeat(1,l),0) -1) * -1)
         Z = hclust.linkage(mat, method='complete')
@@ -928,6 +934,38 @@ class call_cluster(object):
 
         return new_groups
         
+def linkage_cluster(mat, cutoff):
+    
+    l = mat.shape[0]
+    mat=1.-dist.squareform( (1-mat) * (np.diag(np.repeat(1,l),0) -1) * -1)
+    Z = hclust.linkage(mat, method='complete')
+    grps = hclust.fcluster(Z, cutoff, criterion='distance')
+    return grps 
+
+
+def seg_sets_intersect(segs1, segs2, max_frac_uniq = -1):
+    """
+    two sets of segs in an individual, we want to cluster
+    come up w/ some distance
+    """
+    t1 = np.sum(np.array([s_e[1]-s_e[0] for s_e in segs1]))
+    t2 = np.sum(np.array([s_e[1]-s_e[0] for s_e in segs2]))
+    
+    o=0 
+    for se1 in segs1:
+        for se2 in segs2:
+            s1, e1 = se1
+            s2, e2 = se2
+            if s1<=e2 and s2<=e1:
+                o += min(e1,e2)-max(s1,s2)
+    
+    o=float(o)
+    min_frac_o = min(o/t1, o/t2)
+    if max_frac_uniq!=-1 and 1-min_frac_o>=max_frac_uniq:
+        return 0
+    return min_frac_o
+
+
 class cluster_callsets(object):
     """
     a class to cluster calls from multiple individuals
@@ -937,7 +975,7 @@ class cluster_callsets(object):
     """
     
     @classmethod
-    def plot(cls, overlapping_call_clusts, out_dir, g, c, s_es, CNV_s_e, cnv_segs_by_indiv):
+    def plot(cls, overlapping_call_clusts, out_dir, g, indivs_by_seg, s_es, CNV_s_e, cnv_segs_by_indiv):
          
         min_start = 9e9
         max_end = -1
@@ -948,8 +986,7 @@ class cluster_callsets(object):
             max_end = max(max_end, max(call_clust.ends))
             j+=1
 
-        print "chr20", min_start, max_end, len(overlapping_call_clusts)
-        
+        print min_start, max_end, len(overlapping_call_clusts)
             
         plt.gcf().set_size_inches(14,6)
         fig, axes = plt.subplots(2,2) 
@@ -982,7 +1019,16 @@ class cluster_callsets(object):
             axes[1,0].plot(s_e, [y2,y2], 'g', lw=2.5)
             y2-=.1
         
-        p = axes[1,1].pcolor(c)
+        ###############
+        
+        i=0
+        y3=0
+        for seg, indivs in indivs_by_seg.iteritems():
+            for indiv in indivs:      
+                axes[1,1].plot(seg,[y3,y3], colors[i%n_colors], lw=1.5)
+                y3-=1
+            i+=1
+        #p = axes[1,1].pcolor(c)
         #fig.colorbar(p, cax=axes[0,1])
 
         y3=0
@@ -1000,6 +1046,7 @@ class cluster_callsets(object):
         axes[1,0].set_xlim([min_start, max_end])
         axes[1,0].set_ylim([0, y2-.2])
         axes[0,1].set_xlim([min_start, max_end])
+        axes[1,1].set_xlim([min_start, max_end])
         plt.savefig("%s/%d_%d_bps.pdf"%(out_dir, min_start, max_end))
         plt.gcf().clear()
         

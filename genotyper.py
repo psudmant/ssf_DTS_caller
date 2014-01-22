@@ -128,18 +128,18 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff):
     
     return s_e_tups, original_c
 
-def cluster_variant_calls(segs):
+def cluster_segs(segs, max_frac_uniq=0.3):
     clust = m_cluster.call_cluster()
     for seg in segs:
         s,e = seg
         clust.add({'start':s, 'end':e})
-    groups = clust.cluster_by_recip_overlap(0.85, max_frac_uniq=.20)
+        
+    groups = clust.cluster_by_recip_overlap(0.85, max_frac_uniq=max_frac_uniq)
     
     merged_segs = [] 
     for g in groups:
-        s,e =  g.get_med_start_end()
         sub_segs = [[c['start'], c['end']] for c in g.calls]
-        merged_segs.append([[s,e],sub_segs]) 
+        merged_segs.append(sub_segs) 
     
     return merged_segs
   
@@ -179,15 +179,14 @@ def get_segs_from_clustered_indivs(indivs_by_grp, segs_by_grp, indivs_by_cnv_seg
     for grp, indivs in indivs_by_grp.iteritems():
         segs = segs_by_grp[grp]
         #print len(indivs), segs
-        print segs
         uniq_chunks,indivs_in_chunks = get_uniq_chunks(segs, indivs_by_cnv_segs,indivs)
         for i, u_chunk_ses in enumerate(uniq_chunks):
-            print '\t', u_chunk_ses, indivs
+            #print '\t', u_chunk_ses, indivs
             med_s = int(np.median(np.array([se[0] for se in u_chunk_ses])))
             med_e = int(np.median(np.array([se[1] for se in u_chunk_ses])))
             if len(indivs_in_chunks[i]) == len(indivs):
                 indivs_by_segs[tuple([med_s,med_e])] = indivs
-            print "\t", med_s, med_e, len(indivs_in_chunks[i])
+            #print "\t", med_s, med_e, len(indivs_in_chunks[i])
          
     return indivs_by_segs
 
@@ -226,8 +225,67 @@ def cluster_indivs(cnv_segs_by_indiv, g, cutoff=0.85, max_frac_uniq=0.1):
 
     return indivs_by_clust, segs_by_clust 
 
+def clust_seg_groups_by_gt(clust, indivs, g, indivs_by_cnv_segs, contig):
+    
+    all_gts = []
+    for seg in clust:
+        s,e = seg
+        X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
+        gX = g.GMM_genotype(X)
+        g_by_indiv = gX.get_gts_by_indiv()
+
+        gts = [g_by_indiv[indiv] for indiv in indivs]
+        all_gts.append(np.array(gts))
+    
+    gt_clusts = [{"gts":all_gts[0], "segs":[clust[0]]}]
+    
+    for i in xrange(1,len(clust)):
+        for gt_clust in gt_clusts:
+            if np.all(gt_clust["gts"]==all_gts[i]):
+                gt_clust["segs"].append(clust[i])
+                break
+        else:          
+            gt_clusts.append({"gts":all_gts[i], "segs":[clust[i]]})
+    
+    final_seg_to_indiv = {}
+    for gt_clust in gt_clusts: 
+        max_indivs = -1
+        best_seg = []
+        all_indivs = []
+        for seg in gt_clust['segs']:
+            if len(indivs_by_cnv_segs[tuple(seg)])>max_indivs:
+                max_indivs=len(indivs_by_cnv_segs[tuple(seg)])
+                best_seg = tuple(seg)
+                all_indivs+=indivs_by_cnv_segs[tuple(seg)]
+            
+        final_seg_to_indiv[best_seg] = list(Set(all_indivs)) 
+        
+    return final_seg_to_indiv
+
+def cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig):
+
+    segs = []
+    for seg, indivs in indivs_by_cnv_segs.iteritems():
+        segs.append(seg)
+    
+    clusts = cluster_segs(segs, 0.2)
+    
+    new_inds_by_seg = {}
+
+    for clust in clusts:
+        if len(clust)==1:
+            tup = tuple(clust[0])
+            new_inds_by_seg[tup] = indivs_by_cnv_segs[tup]
+        
+        inds_by_seg = clust_seg_groups_by_gt(clust, g.indivs, g, indivs_by_cnv_segs, contig)
+        
+        for seg, inds in inds_by_seg.iteritems():
+            new_inds_by_seg[tuple(seg)] = inds
+            
+    return new_inds_by_seg
+                
      
-def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65, plot=False):
+def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.65, plot=False):
     """
     First chop up into ALL constituate parts
     """
@@ -252,8 +310,9 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65, pl
     s_e_segs = []
     for i in xrange(len(all_starts_ends)-1):
         s_e_segs.append([all_starts_ends[i], all_starts_ends[i+1]])
+
     t = time.time()
-    print "getting var chunks...", s_e_segs
+    print "getting var chunks..."
     CNV_segs, CNV_gXs = filter_invariant_segs(s_e_segs, g, contig) 
     print "got var chunks in %fs"%(time.time()-t)
     
@@ -261,6 +320,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65, pl
         indivs_to_assess = [None for i in s_e_segs]
         exclude_loci = [None for i in s_e_segs]
         return s_e_segs, indivs_to_assess, True
+    
     else:
 
         cnv_segs_by_indiv = {}
@@ -275,7 +335,6 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65, pl
                         indiv_cnv_segs.append(seg)
             cnv_segs_by_indiv[indiv] = indiv_cnv_segs
         
-        
         indivs_by_cnv_segs = {}
         for indiv, cnv_segs in  cnv_segs_by_indiv.iteritems():
             for s_e in cnv_segs:
@@ -287,10 +346,12 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65, pl
         indivs_by_grp, segs_by_grp = cluster_indivs(cnv_segs_by_indiv,g, 0.85, max_frac_uniq=.1) 
         indivs_by_cnv_segs = get_segs_from_clustered_indivs(indivs_by_grp, segs_by_grp, indivs_by_cnv_segs, g)
         
+        #finally cluster these?????
+        indivs_by_cnv_segs = cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig)
+        
         if plot: 
             m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test", g, indivs_by_cnv_segs, [], CNV_segs, cnv_segs_by_indiv)
-
-
+        
         #m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
         s_e_segs = []
         indivs_to_assess = []
@@ -425,7 +486,11 @@ def get_best_gt(call, contig, g):
     raw_input()
     
 
-
+class filter_obj:
+    def __init__(self, min_max_mu_d, min_med_med):
+        self.min_max_mu_d = min_max_mu_d
+        self.min_med_med = min_med_med
+        
 class GMM_gt(object):
 
     def __init__(self, X, gmm, labels, Z, params, bics, indivs):
@@ -535,15 +600,15 @@ class GMM_gt(object):
         return min(min_l, min_r)
 
 
-    def fail_filter(self, mu_mu_min, frac_dir_min):
-
+    def fail_filter(self, filt):
+        
         if self.f_correct == None: 
             self.f_correct = self.correct_order_proportion()
         
         #mean_mu_delta = self.get_mean_inter_mu_dist()
         mu_mu_d, min_mu_d, max_mu_d = self.get_mean_min_max_inter_mu_dist()
         
-        if (max_mu_d < mu_mu_min):
+        if (max_mu_d < filt.min_max_mu_d):
             return True
 
         return False
@@ -631,18 +696,6 @@ class GMM_gt(object):
                 new_labels_to_gt[l] = gt+d
             labels_to_gt = new_labels_to_gt
         
-        # finally double check the cps make sense...
-        #sorted_gts = np.array(sorted(labels_to_gt.values()))
-        #
-        #l_eval = lambda x: np.sum(np.pow(x[0] - x[1]),2)
-        #
-        #v = l_eval([sorted_gts, ordered_mus])
-
-        #for i xrange(1,len(sorted_gts)):
-        #    if l_eval([sorted_gts[i:]+1,ordered_mus]) < v:
-        #        labels_to_gt
-        #        sorted_gts = np.array(sorted(labels_to_gt.values()))
-        #        v = l_eval([sorted_gts, ordered_mus])
         gts_by_indiv = {}
         for i, indiv in enumerate(self.indivs):  
             gts_by_indiv[indiv] = labels_to_gt[self.labels[i]] 
@@ -685,13 +738,13 @@ class GMM_gt(object):
         
         return False
         
-def output(g, contig, s, e, F_gt, F_call, F_filt, include_indivs=None, plot=False):
+def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plot=False):
 
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs)
     
-    print contig, s, e, gX.n_clusts, gX.fail_filter(.5,.5)
-    if gX.n_clusts == 1 or gX.fail_filter(.5,.5):
+    print contig, s, e, gX.n_clusts, gX.fail_filter(filt)
+    if gX.n_clusts == 1 or gX.fail_filter(filt):
         return
 
     F_call.write("%s\t%d\t%d\n"%(contig, s, e))

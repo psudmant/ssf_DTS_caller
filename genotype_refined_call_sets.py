@@ -12,7 +12,15 @@ from get_windowed_variance import get_windowed_variance
 import genotyper as gt
 
 
-
+def get_min_max(cc):
+    mn = 9e9
+    mx = -1
+    for c in cc: 
+        s,e = c.get_min_max_start_end()
+        mn = min(s,mn)
+        mx = max(e,mx)
+    
+    return mn, mx
 
 if __name__=='__main__':
 
@@ -48,10 +56,19 @@ if __name__=='__main__':
     iterate over lists of overlapping calls
     each element in the list is a recip overlap cluster
     """
+    do_plot = True
     do_plot = False
     g.setup_output(F_gt, F_filt)
     k=-1
+
+    filt = gt.filter_obj(0.5,0.5)
+
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
+        mn, mx = get_min_max(overlapping_call_clusts)
+           
+        if contig == "chr2" and not (mx>=242817287 and mn<=243191022): continue
+        if contig == "chr20" and not (mx>=1548059 and mn<=1601096): continue
+        
         """
         2 cases
         1. there is one call in the cluster - simply output the call w/ genotypes
@@ -64,19 +81,20 @@ if __name__=='__main__':
         if len(overlapping_call_clusts) == 1:
             c = overlapping_call_clusts[0]
             start, end = c.get_med_start_end()
-            gt.output(g, contig, start, end, F_gt, F_call, F_filt, plot=do_plot)  
+            gt.output(g, contig, start, end, F_gt, F_call, F_filt, filt, plot=do_plot)  
         else:
-            s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig)
+            s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=do_plot)
             
             if len(s_e_segs)<=1 or non_adj:
                 for s_e in s_e_segs:
                     s,e = s_e
-                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, plot=do_plot)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, plot=do_plot)  
             else:
                 for i, s_e in enumerate(s_e_segs):
                     s,e = s_e
+                    print s, e
                     inc_indivs = include_indivs[i]
-                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, include_indivs=inc_indivs, plot=do_plot)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=inc_indivs, plot=do_plot)  
 
     F_gt.close()
     F_call.close()

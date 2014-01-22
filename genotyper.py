@@ -26,7 +26,7 @@ from wnd_cp_data import wnd_cp_indiv
 from gglob import gglob
 
 import cluster as m_cluster
-
+from sets import Set
 from scipy.stats.mstats import mode
 
 import IPython
@@ -128,11 +128,110 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff):
     
     return s_e_tups, original_c
 
+def cluster_variant_calls(segs):
+    clust = m_cluster.call_cluster()
+    for seg in segs:
+        s,e = seg
+        clust.add({'start':s, 'end':e})
+    groups = clust.cluster_by_recip_overlap(0.85, max_frac_uniq=.20)
+    
+    merged_segs = [] 
+    for g in groups:
+        s,e =  g.get_med_start_end()
+        sub_segs = [[c['start'], c['end']] for c in g.calls]
+        merged_segs.append([[s,e],sub_segs]) 
+    
+    return merged_segs
+  
 
+def get_uniq_chunks(segs, indivs_by_cnv_segs, indivs):
+    
+    s_indivs = Set(indivs)
+    segs = sorted(segs, key=lambda x:(x[0],x[1]))
+    mn,mx = segs[0][0],segs[0][1]
+    uniq_chunks = [[]] 
+    indivs_in_chunk = [[]]
+    
+    curr_indivs = [] 
+    for seg in segs:
+        if seg[0]<=mx and seg[1]>=mn:
+            uniq_chunks[-1].append(seg)
+            indivs_in_chunk[-1] += indivs_by_cnv_segs[tuple(seg)]
+            mn,mx = min(mn,seg[0]), max(seg[1],mx)
+        else:
+            indivs_in_chunk.append([])
+            uniq_chunks.append([])
+            uniq_chunks[-1].append(seg)
+            indivs_in_chunk[-1] += indivs_by_cnv_segs[tuple(seg)]
+            mn,mx = seg
+    
+    n_indivs_in_chunk = []
+    for inds in indivs_in_chunk:
+        #take indivs AND indivs in the chunk
+        n_indivs_in_chunk.append(list(Set(inds).intersection(s_indivs)))
+
+    return uniq_chunks, n_indivs_in_chunk
+
+def get_segs_from_clustered_indivs(indivs_by_grp, segs_by_grp, indivs_by_cnv_segs, g):
+    
+    indivs_by_segs = {}
+
+    for grp, indivs in indivs_by_grp.iteritems():
+        segs = segs_by_grp[grp]
+        #print len(indivs), segs
+        print segs
+        uniq_chunks,indivs_in_chunks = get_uniq_chunks(segs, indivs_by_cnv_segs,indivs)
+        for i, u_chunk_ses in enumerate(uniq_chunks):
+            print '\t', u_chunk_ses, indivs
+            med_s = int(np.median(np.array([se[0] for se in u_chunk_ses])))
+            med_e = int(np.median(np.array([se[1] for se in u_chunk_ses])))
+            if len(indivs_in_chunks[i]) == len(indivs):
+                indivs_by_segs[tuple([med_s,med_e])] = indivs
+            print "\t", med_s, med_e, len(indivs_in_chunks[i])
+         
+    return indivs_by_segs
+
+def cluster_indivs(cnv_segs_by_indiv, g, cutoff=0.85, max_frac_uniq=0.1):
+    
+    l = len(g.indivs)
+    mat = np.zeros([l,l])
+
+    for i, indiv_1 in enumerate(g.indivs):
+        for j, indiv_2 in enumerate(g.indivs):
+            segs1 = cnv_segs_by_indiv[indiv_1] 
+            segs2 = cnv_segs_by_indiv[indiv_2]
+             
+            if len(segs1) == 0 or len(segs2) ==0:
+                mat[i,j] = 1
+            elif i==j:
+                mat[i,j] = 0 
+            else:
+                mat[i,j] = 1-m_cluster.seg_sets_intersect(cnv_segs_by_indiv[indiv_1], cnv_segs_by_indiv[indiv_2], max_frac_uniq)
+    
+    grps = m_cluster.linkage_cluster(mat, cutoff)
+    
+    indivs_by_clust = {}
+    segs_by_clust = {}
+    
+    for grp in np.unique(grps):
+        inds = []
+        segs = []
+        for j in np.where(grps==grp)[0]:
+            if len(cnv_segs_by_indiv[g.indivs[j]])>0:
+                inds.append(g.indivs[j])
+                segs+=cnv_segs_by_indiv[g.indivs[j]]
+        if len(inds)>0: 
+            indivs_by_clust[grp] = inds
+            segs_by_clust[grp] = segs
+
+    return indivs_by_clust, segs_by_clust 
+
+     
 def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65, plot=False):
     """
     First chop up into ALL constituate parts
     """
+    
     all_starts_ends = []
     min_s, max_e = 9e9, -1
     for clust in overlapping_call_clusts: 
@@ -142,45 +241,56 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, r_cutoff = 0.65, pl
         all_starts_ends.append(s)
         all_starts_ends.append(e)
     
+    """
     #merge correllated calls
+    #commented for now...
     r_cutoff=1.0
     s_e_segs, c = get_correlated_segments(all_starts_ends, g, contig, r_cutoff)
+    """
+    #instead of correlation cleaning, use below 4
+    all_starts_ends = sorted(np.unique(all_starts_ends))
+    s_e_segs = []
+    for i in xrange(len(all_starts_ends)-1):
+        s_e_segs.append([all_starts_ends[i], all_starts_ends[i+1]])
+    t = time.time()
+    print "getting var chunks...", s_e_segs
     CNV_segs, CNV_gXs = filter_invariant_segs(s_e_segs, g, contig) 
-        
-    
-
-    """
-    get variant chunks PER individual
-    """
-
-    cnv_segs_by_indiv = {}
-    for i, indiv in enumerate(g.indivs):
-        indiv_cnv_segs = []
-        for i, gX in enumerate(CNV_gXs):
-            seg = list(CNV_segs[i])
-            if gX.is_var(indiv, g, force_not_mode=True):
-                if len(indiv_cnv_segs)>0 and seg[0] == indiv_cnv_segs[-1][1]: 
-                    indiv_cnv_segs[-1][1] = seg[1]
-                else:
-                    indiv_cnv_segs.append(seg)
-        cnv_segs_by_indiv[indiv] = indiv_cnv_segs
-    
-    if plot: 
-        m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv)
-
-    indivs_by_cnv_segs = {}
-    for indiv, cnv_segs in  cnv_segs_by_indiv.iteritems():
-        for s_e in cnv_segs:
-            s_e_tup = tuple(s_e)
-            if not s_e_tup in indivs_by_cnv_segs:
-                indivs_by_cnv_segs[s_e_tup] = []
-            indivs_by_cnv_segs[s_e_tup].append(indiv)
+    print "got var chunks in %fs"%(time.time()-t)
     
     if len(CNV_segs) <= 1 or non_adjacent(CNV_segs):
         indivs_to_assess = [None for i in s_e_segs]
         exclude_loci = [None for i in s_e_segs]
         return s_e_segs, indivs_to_assess, True
     else:
+
+        cnv_segs_by_indiv = {}
+        for i, indiv in enumerate(g.indivs):
+            indiv_cnv_segs = []
+            for i, gX in enumerate(CNV_gXs):
+                seg = list(CNV_segs[i])
+                if gX.is_var(indiv, g, force_not_mode=True):
+                    if len(indiv_cnv_segs)>0 and seg[0] == indiv_cnv_segs[-1][1]: 
+                        indiv_cnv_segs[-1][1] = seg[1]
+                    else:
+                        indiv_cnv_segs.append(seg)
+            cnv_segs_by_indiv[indiv] = indiv_cnv_segs
+        
+        
+        indivs_by_cnv_segs = {}
+        for indiv, cnv_segs in  cnv_segs_by_indiv.iteritems():
+            for s_e in cnv_segs:
+                s_e_tup = tuple(s_e)
+                if not s_e_tup in indivs_by_cnv_segs:
+                    indivs_by_cnv_segs[s_e_tup] = []
+                indivs_by_cnv_segs[s_e_tup].append(indiv)
+        
+        indivs_by_grp, segs_by_grp = cluster_indivs(cnv_segs_by_indiv,g, 0.85, max_frac_uniq=.1) 
+        indivs_by_cnv_segs = get_segs_from_clustered_indivs(indivs_by_grp, segs_by_grp, indivs_by_cnv_segs, g)
+        
+        if plot: 
+            m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test", g, indivs_by_cnv_segs, [], CNV_segs, cnv_segs_by_indiv)
+
+
         #m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
         s_e_segs = []
         indivs_to_assess = []
@@ -215,6 +325,7 @@ def filter_invariant_segs(s_e_segs, g, contig):
         s, e = s_e
         X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
         gX = g.GMM_genotype(X)
+        #print s, e, gX.n_clusts
         if gX.n_clusts > 1:
             if np.all(prev_labels == gX.labels):
                 CNV_segs[-1][1] = e 

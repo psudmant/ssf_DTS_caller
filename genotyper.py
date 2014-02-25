@@ -93,10 +93,8 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
     for j in xrange(c.shape[0]-1):
         off_diag.append(c[j,j+1])
     
-
-    if do_plot:
+    if do_plot and 0:
         print "PLAAAAAAATING!"
-        continue
         plt.gcf().set_size_inches(14,6)
         fig, axes = plt.subplots(2)
         p = axes[0].pcolor(c)

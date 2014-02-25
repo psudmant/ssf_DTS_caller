@@ -95,8 +95,8 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
     
 
     if do_plot:
-        print "PLAAAAAAATING!"
         continue
+        print "PLAAAAAAATING!"
         plt.gcf().set_size_inches(14,6)
         fig, axes = plt.subplots(2)
         p = axes[0].pcolor(c)

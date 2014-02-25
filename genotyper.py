@@ -1065,6 +1065,7 @@ class genotyper:
             if np.all(grps == prev_grps): continue
 
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
+            print init_vars
 
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 

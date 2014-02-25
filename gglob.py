@@ -49,7 +49,7 @@ class gglob:
                             fn_sunk_contigs = fn_sunk_contigs)
 
         """
-
+        
         DTS_dir = kwargs["DTS_dir"]
         DTS_prefix = kwargs["DTS_prefix"]
         
@@ -107,7 +107,7 @@ class gglob:
                    sunk_cp_matrix = sunk_cp_matrix)
         
     @classmethod
-    def init_from_gglob_dir(cls, gglob_dir, contig):
+    def init_from_gglob_dir(cls, gglob_dir, contig, indiv_subset=None):
         
         #open up the index
         idx_data = None
@@ -140,6 +140,23 @@ class gglob:
         sunk_wnd_ends = mats_by_key['sunk_wnd_ends'][:,0]
         sunk_cp_matrix = mats_by_key['sunk_cp_matrix']
         
+        if indiv_subset!=None:
+            new_indivs = []
+            new_indivs_idxs = []
+            i=0
+            for indiv in indivs:
+                if indiv in indiv_subset:
+                    new_indivs.append(indiv)
+                    new_indivs_idxs.append(i)
+                i+=1    
+            l = len(new_indivs)
+            new_indivs_idxs = np.array(new_indivs_idxs)
+            
+            cp_matrix = cp_matrix[new_indivs_idxs,:]  
+            
+            sunk_cp_matrix = sunk_cp_matrix[new_indivs_idxs,:] 
+            indivs = new_indivs
+
         return cls(indivs = indivs,
                    wnd_size = wnd_size,
                    wnd_slide = wnd_slide,

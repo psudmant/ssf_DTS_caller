@@ -28,7 +28,6 @@ if __name__=='__main__':
 
     opts.add_option('','--gglob_dir',dest='gglob_dir')
     opts.add_option('','--dup_tabix',dest='fn_dup_tabix')
-    
     #opts.add_option('','--in_DTS_dir',dest='in_DTS_dir')
     #opts.add_option('','--in_sunk_DTS_dir',dest='in_sunk_DTS_dir')
     #opts.add_option('','--contigs',dest='fn_contigs')
@@ -41,13 +40,20 @@ if __name__=='__main__':
     opts.add_option('','--call_table',dest='fn_call_table',default=None)
     opts.add_option('','--total_subsets',dest='total_subsets',type=int,default=1)
     opts.add_option('','--subset',dest='subset',type=int,default=0)
+    opts.add_option('','--subset_indivs',dest='subset_indivs', default=None)
+    
+    opts.add_option('','--do_plot',dest='do_plot',action="store_true",default=False)
     
     (o, args) = opts.parse_args()
     
+    subset_indivs = o.subset_indivs
+    if subset_indivs!=None:
+        subset_indivs = subset_indivs.split(":")
+
     contig = o.contig
     tbx_dups = pysam.Tabixfile(o.fn_dup_tabix)
     callset_clust = cluster.cluster_callsets(o.fn_call_table, contig)
-    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir)
+    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs)
     F_gt = open(o.fn_gt_out,'w')
     F_call = open(o.fn_call_out,'w')
     F_filt = open("%s.filter_inf"%o.fn_call_out,'w')
@@ -56,19 +62,20 @@ if __name__=='__main__':
     iterate over lists of overlapping calls
     each element in the list is a recip overlap cluster
     """
-    do_plot = True
-    do_plot = False
+    do_plot = o.do_plot
+     
     g.setup_output(F_gt, F_filt)
     k=-1
 
     filt = gt.filter_obj(0.5,0.5)
-
+    
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
         mn, mx = get_min_max(overlapping_call_clusts)
            
-        if contig == "chr2" and not (mx>=242817287 and mn<=243191022): continue
-        if contig == "chr20" and not (mx>=1548059 and mn<=1601096): continue
-        
+        #if contig == "chr2" and not (mx>=242817287 and mn<=243191022): continue
+        #if contig == "chr20" and not (mx>=1548059 and mn<=1601096): continue
+        #if contig == "chr6" and not (mx>=151476852 and mn<=151495535): continue
+         
         """
         2 cases
         1. there is one call in the cluster - simply output the call w/ genotypes
@@ -77,7 +84,7 @@ if __name__=='__main__':
         k+=1
 
         if k%100==0: print "%d genotypes evaluated..."%k
-
+        
         if len(overlapping_call_clusts) == 1:
             c = overlapping_call_clusts[0]
             start, end = c.get_med_start_end()

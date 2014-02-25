@@ -148,7 +148,18 @@ class indiv_cluster_calls:
         return curr_dCGHs
 
 
-    def resolve_overlapping_clusters(self, ll_cutoff, tbx_dups, indiv_id, indiv_DTS, ref_DTSs, dCGHs, gglob_dir, out_viz_dir, verbose=False, min_overlapping=2):
+    def resolve_overlapping_clusters(self, ll_cutoff, 
+                                           tbx_dups, 
+                                           indiv_id, 
+                                           indiv_DTS, 
+                                           ref_DTSs, 
+                                           dCGHs, 
+                                           gglob_dir, 
+                                           out_viz_dir,
+                                           verbose=False, 
+                                           min_overlapping=2, 
+                                           subset_indivs=None,
+                                           min_d=0):
         """
         resolve overlapping clusters into individual calls 
         let the calls have likelihoods
@@ -162,21 +173,24 @@ class indiv_cluster_calls:
         final_calls = []
         
         for chr, overlapping_calls in self.overlapping_calls_by_chr.iteritems():
-            print >>stderr, chr
+            print >>stderr, chr, "%d calls in this chr"%(len(overlapping_calls))
             
             indiv_cps = indiv_DTS.get_cps_by_chr(chr) 
             ref_cps = {}
             for ref, refDTS in ref_DTSs.iteritems():
                 ref_cps[ref] = refDTS.get_cps_by_chr(chr) 
-
-            g = genotyper(chr, gglob_dir=gglob_dir, plot_dir=out_viz_dir) 
+            
+            g = genotyper(chr, gglob_dir=gglob_dir, plot_dir=out_viz_dir, subset_indivs = subset_indivs) 
 
             curr_dCGHs = self.get_curr_chr_dCGHs(chr, dCGHs)
             wnd_starts, wnd_ends = indiv_DTS.get_wnds_by_chr(chr)
 
+            t=time.time()
+            n_assessed=-1
             for overlap_cluster in overlapping_calls:
                 overlap_cutoff = 0.85
                 #overlap_cutoff = 0.75
+                n_assessed+=1
                 
                 resolved_calls = overlap_cluster.overlap_resolve(overlap_cutoff, 
                                                                  ll_cutoff, 
@@ -195,7 +209,7 @@ class indiv_cluster_calls:
 
                     if d > 1.0:
                         variable_clusts.append(clust)
-                    else:
+                    elif d>min_d:
                         X, idx_s, idx_e = g.get_gt_matrix(chr, clust.get_med_start(), clust.get_med_end())
                         gX = g.GMM_genotype(X)
                         if gX.gmm.n_components>1 and gX.is_var(indiv_id, g):
@@ -206,6 +220,7 @@ class indiv_cluster_calls:
                 for clust in overlapping_call_clusts:
                     final_call = self.get_final_call(clust)
                     final_calls.append(final_call)
+                
 
                 """
                 if min(overlap_cluster.all_starts)>14454554 and min(overlap_cluster.all_starts)<14933135:
@@ -213,6 +228,7 @@ class indiv_cluster_calls:
                 raw_input()
                 """
                 #overlapping_call_clusts = get_overlapping_call_clusts(resolved_calls, flatten = True)
+            print "n-final_calls:%d n_assessed:%d time_elapsed:%fs"%(len(final_calls), n_assessed, time.time()-t)
 
         print >>stderr, "done"
         print >>stderr, "%d calls with likelihood <%f"%(len(final_calls), ll_cutoff)
@@ -245,6 +261,9 @@ class indiv_cluster_calls:
         return f_call
 
     def get_delta(self, call_clust, wnd_starts, wnd_ends, dCGHs, indiv_cps, ref_cps):
+        """
+        the mean distance between an individual call and the refs it was called against
+        """
         
         start, end = call_clust.get_med_start(), call_clust.get_med_end()
         w_s, w_e = np.searchsorted(wnd_starts, start), np.searchsorted(wnd_ends, end)
@@ -801,7 +820,7 @@ class indiv_call_cluster:
         """
 
         mat = np.zeros((self.size,self.size))
-
+        
         for i in xrange(self.size):
             for j in xrange(self.size):
                 #mat[i,j] = 1-((self.frac_overlap(i,j)+self.frac_overlap(j,i))/2.0)

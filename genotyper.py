@@ -4,6 +4,7 @@ import numpy as np
 
 import time
 import matplotlib.pyplot as plt
+import matplotlib
 import matplotlib.colors as mCols
 import matplotlib.cm as cm
 import matplotlib.mlab as mlab
@@ -66,8 +67,8 @@ class genotype_table:
 
 
 
-def get_correlation_matrix(starts_ends, g, contig):
-
+def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
+    
     n_indivs = len(g.indivs)
     l = len(starts_ends)-1
     mus = np.zeros((n_indivs,l))
@@ -77,11 +78,13 @@ def get_correlation_matrix(starts_ends, g, contig):
     n_indivs = len(g.indivs)
     l = len(starts_ends)-1
     mus = np.zeros((l,n_indivs))
-     
+    
+    min_s, max_e = starts_ends[0], starts_ends[-1]
     for i in xrange(l):
         s, e = starts_ends[i], starts_ends[i+1] 
         X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
-        mus[i,:] = np.mean(X,1)    
+        mus[i,:] = np.mean(X,1)   
+        print contig, s, e
     
     c =  np.corrcoef(mus)
     
@@ -90,9 +93,43 @@ def get_correlation_matrix(starts_ends, g, contig):
     for j in xrange(c.shape[0]-1):
         off_diag.append(c[j,j+1])
     
+
+    if do_plot:
+        print "PLAAAAAAATING!"
+        continue
+        plt.gcf().set_size_inches(14,6)
+        fig, axes = plt.subplots(2)
+        p = axes[0].pcolor(c)
+        fig.colorbar(p, cax=axes[1])
+        plt.savefig("%s/%s_cor_%d_%d_bps.pdf"%(outdir, contig, min_s, max_e))
+        plt.gcf().clear()
+        
+        d = int(np.floor(np.sqrt(l)))+1
+        plt.gcf().set_size_inches(18,10)
+        
+        fig, axes = plt.subplots(d,d)
+        
+        font = {'family' : 'normal', 'weight': 'normal', 'size': 4} 
+        matplotlib.rc('font', **font)
+
+        for i in xrange(d): 
+            for j in xrange(d): 
+                mus[0]
+                #p = (j*d)+i
+                p = (i*d)+j
+                if p<l-1:
+                    axes[i,j].plot(mus[p], mus[p+1],'b.', ms=.1)
+                    min_x, max_y = np.amin(mus[p]), (np.amin(mus[p+1])+np.amax(mus[p+1]))/2.0
+                    axes[i,j].text(min_x,max_y,"%.2f"%off_diag[p], fontsize=4)
+                    axes[i,j].text(min_x,max_y-.5,"%d"%starts_ends[p+1], fontsize=4)
+                    axes[i,j].xaxis.set_tick_params(width=1)
+                    axes[i,j].yaxis.set_tick_params(width=1)
+        plt.savefig("%s/%s_i_cors_%d_%d_bps.pdf"%(outdir, contig, min_s, max_e))
+        plt.gcf().clear()
+
     return c, off_diag
 
-def get_correlated_segments(all_starts_ends, g, contig, r_cutoff):
+def get_correlated_segments(all_starts_ends, g, contig, r_cutoff, outdir, do_plot=False):
     """
     take a set of coordinates representing starts and ends
     over a locus and cluster them into contiguous chunks that
@@ -102,7 +139,7 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff):
     
     all_starts_ends = sorted(np.unique(all_starts_ends))
     
-    c, off_diag = get_correlation_matrix(all_starts_ends, g, contig)
+    c, off_diag = get_correlation_matrix(all_starts_ends, g, contig, outdir=outdir, do_plot=do_plot)
     #print all_starts_ends 
     original_c = c
     prev_gts = None
@@ -128,7 +165,7 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff):
     
     return s_e_tups, original_c
 
-def cluster_segs(segs, max_frac_uniq=0.3):
+def cluster_segs(segs, max_frac_uniq=0.2):
     clust = m_cluster.call_cluster()
     for seg in segs:
         s,e = seg
@@ -262,13 +299,13 @@ def clust_seg_groups_by_gt(clust, indivs, g, indivs_by_cnv_segs, contig):
         
     return final_seg_to_indiv
 
-def cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig):
+def cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, max_uniq_thresh):
 
     segs = []
     for seg, indivs in indivs_by_cnv_segs.iteritems():
         segs.append(seg)
     
-    clusts = cluster_segs(segs, 0.2)
+    clusts = cluster_segs(segs, max_uniq_thresh)
     
     new_inds_by_seg = {}
 
@@ -302,14 +339,16 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.
     """
     #merge correllated calls
     #commented for now...
-    r_cutoff=1.0
-    s_e_segs, c = get_correlated_segments(all_starts_ends, g, contig, r_cutoff)
     """
+
+    r_cutoff=.9
+    s_e_segs, c = get_correlated_segments(all_starts_ends, g, contig, r_cutoff, "./plotting/test", do_plot=plot)
+
     #instead of correlation cleaning, use below 4
-    all_starts_ends = sorted(np.unique(all_starts_ends))
-    s_e_segs = []
-    for i in xrange(len(all_starts_ends)-1):
-        s_e_segs.append([all_starts_ends[i], all_starts_ends[i+1]])
+    #all_starts_ends = sorted(np.unique(all_starts_ends))
+    #s_e_segs = []
+    #for i in xrange(len(all_starts_ends)-1):
+    #    s_e_segs.append([all_starts_ends[i], all_starts_ends[i+1]])
 
     t = time.time()
     print "getting var chunks..."
@@ -347,7 +386,8 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.
         indivs_by_cnv_segs = get_segs_from_clustered_indivs(indivs_by_grp, segs_by_grp, indivs_by_cnv_segs, g)
         
         #finally cluster these?????
-        indivs_by_cnv_segs = cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig)
+        if len(indivs_by_cnv_segs.keys())>1:
+            indivs_by_cnv_segs = cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, 0.3)
         
         if plot: 
             m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test", g, indivs_by_cnv_segs, [], CNV_segs, cnv_segs_by_indiv)
@@ -742,8 +782,6 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plo
 
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs)
-    
-    print contig, s, e, gX.n_clusts, gX.fail_filter(filt)
     if gX.n_clusts == 1 or gX.fail_filter(filt):
         return
 
@@ -805,9 +843,9 @@ class genotyper:
         self.sunk_cp_matrix = g.sunk_cp_matrix
 
     
-    def init_on_gglob(self, contig, fn_gglob):
+    def init_on_gglob(self, contig, fn_gglob, subset_indivs):
         
-        g = gglob.init_from_gglob_dir(contig, fn_gglob)
+        g = gglob.init_from_gglob_dir(contig, fn_gglob, indiv_subset=subset_indivs)
         
         self.indivs = g.indivs
         self.wnd_starts = g.wnd_starts
@@ -824,6 +862,9 @@ class genotyper:
         self.gglob_dir = kwargs.get("gglob_dir", None) 
         self.plot_dir  = kwargs.get("plot_dir", None)
         
+        subset_indivs  = kwargs.get("subset_indivs", None)
+        
+
         self.contig = contig
         self.indivs = []
         self.wnd_starts = None
@@ -835,13 +876,13 @@ class genotyper:
         self.sunk_cp_matrix = None
         
         if self.gglob_dir:
-            self.init_on_gglob(self.gglob_dir, self.contig) 
+            self.init_on_gglob(self.gglob_dir, self.contig, subset_indivs) 
         else:
             self.init_on_indiv_DTS_files(self, **kwargs)
-
-        print >>stderr, "loading genomes..."
+    
+        k = self.cp_matrix.shape[0]
+        print >>stderr, "loading %d genomes..."%(k)
         t = time.time()
-        
         print >>stderr, "done (%fs)"%(time.time()-t)
        
     def addGMM(self, gmm, ax, X):
@@ -886,16 +927,17 @@ class genotyper:
         axarr[0,0].set_xlim(-0.10,max(cps)+1)
         axarr[0,0].set_ylim(-0.10,max(sunk_cps)+1)
         
-        n, bins, patches = axarr[1,1].hist(cps,alpha=.9,ec='none',normed=1,color='r',bins=len(cps)/20)
+        n, bins, patches = axarr[1,1].hist(cps,alpha=.9,ec='none',normed=1,color='r',bins=len(cps)/10)
         self.addGMM(gX.gmm, axarr[1,1], cps)
         fig.sca(axarr[0,2]) 
         dendro = hclust.dendrogram(gX.Z, orientation='right')
         #self.aug_dendrogram(axarr[0,2], dendro)
         
-        n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,color='g',bins=len(cps)/20)
-        self.addGMM(gXs.gmm, axarr[1,0], sunk_cps)
-        axarr[0,1].plot(gX.params, gX.bics, 'ro-')
-        axarr[0,1].plot(gXs.params, gXs.bics, 'go-')
+        if np.sum(np.isnan(sunk_cps)) == 0:
+            n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,color='g',bins=len(cps)/10)
+            self.addGMM(gXs.gmm, axarr[1,0], sunk_cps)
+            axarr[0,1].plot(gX.params, gX.bics, 'ro-')
+            axarr[0,1].plot(gXs.params, gXs.bics, 'go-')
         
         fig.sca(axarr[1,2]) 
         dendro = hclust.dendrogram(gXs.Z, orientation='right')
@@ -939,7 +981,7 @@ class genotyper:
             start_idx+=1
         
         X = self.cp_matrix[:,start_idx:end_idx]
-        
+         
         return X, start_idx, end_idx
     
     def get_sunk_gt_matrix(self, contig, start, end, vb=False):
@@ -1007,11 +1049,16 @@ class genotyper:
                     
         mus = np.mean(X,1)
         mus = np.reshape(mus, (mus.shape[0],1))
-        
         dist_mat = dist.pdist(mus)
+        print "h_clustering..."
+        t = time.time()
         Z = hclust.linkage(mus, method='centroid', metric='euclidean')
+        print "done %fs"%(time.time()-t)
         params, bics, gmms, all_labels = [], [], [], []
         
+        print "assessing genotypes" 
+        t = time.time()
+
         prev_grps = np.array([])
         for k in np.arange(.2, 0.7,  0.001):
             grps = hclust.fcluster(Z, k, criterion='distance')
@@ -1027,6 +1074,7 @@ class genotyper:
             all_labels.append(labels)
             prev_grps = grps 
 
+        print "done %fs"%(time.time()-t)
         grps = np.zeros(mus.shape[0])
         init_mus, init_vars, init_weights = self.initialize(mus, grps) 
         gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)

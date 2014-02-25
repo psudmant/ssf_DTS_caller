@@ -61,6 +61,13 @@ if __name__=="__main__":
      
     opts.add_option('', '--contigs', dest='fn_contigs', default=None)
     opts.add_option('', '--window_size', dest='window_size', type=int, default=None)
+    opts.add_option('', '--min_ref_cp_delta', dest='min_d', type=float, default=0)
+
+    """
+        min_delta - the min mean cp distance between an individual and the refs it was called against 
+    """
+    
+    opts.add_option('', '--subset_indivs', dest='subset_indivs', default=None)
 
     """
         min_overlapping_calls in the minimum # of calls
@@ -68,6 +75,12 @@ if __name__=="__main__":
     
     (o, args) = opts .parse_args()
     
+    subset_indivs = o.subset_indivs
+    
+    if subset_indivs != None:
+        subset_indivs = subset_indivs.split(":")
+        subset_indivs = list(set(subset_indivs))
+
     indiv_DTS = wnd_cp_indiv(o.fn_indiv_DTS, o.fn_contigs, o.window_size) 
     indiv_id = o.fn_indiv_DTS.split("/")[-1].replace("500_bp_","")
 
@@ -111,7 +124,9 @@ if __name__=="__main__":
                                                               o.gglob_dir,
                                                               o.viz_dir,
                                                               verbose=False, 
-                                                              min_overlapping=o.min_overlapping_calls)
+                                                              min_overlapping=o.min_overlapping_calls,
+                                                              subset_indivs=subset_indivs,
+                                                              min_d=o.min_d)
 
     #output_indiv_clust_elements(final_calls, o.fn_out_resolved)
     output_calls(final_calls, o.fn_out_resolved)

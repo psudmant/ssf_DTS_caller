@@ -95,9 +95,6 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
     
 
     if do_plot:
-        """
-        print test
-        """
         print "PLAAAAAAATING!"
         continue
         plt.gcf().set_size_inches(14,6)

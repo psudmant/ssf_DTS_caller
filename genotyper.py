@@ -1126,7 +1126,10 @@ class genotyper:
         
         return init_mus, init_vars, init_weights
         
-    def pw_GMM_overlap(self, gmm):
+    def __pw_GMM_overlap(self, gmm):
+        """
+        DEPRECATED - incorrect
+        """
         
         overlaps = []       
         mus = gmm.means[:,0]

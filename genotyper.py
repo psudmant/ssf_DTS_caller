@@ -93,13 +93,15 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
     for j in xrange(c.shape[0]-1):
         off_diag.append(c[j,j+1])
     
-    if do_plot and 0:
+    if do_plot:
         print "PLAAAAAAATING!"
         plt.gcf().set_size_inches(14,6)
         fig, axes = plt.subplots(2)
         p = axes[0].pcolor(c)
         fig.colorbar(p, cax=axes[1])
         plt.savefig("%s/%s_cor_%d_%d_bps.pdf"%(outdir, contig, min_s, max_e))
+        """
+        #PLOT INDIVIDUAL CORRELATIONS
         plt.gcf().clear()
         
         d = int(np.floor(np.sqrt(l)))+1
@@ -109,7 +111,7 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
         
         font = {'family' : 'normal', 'weight': 'normal', 'size': 4} 
         matplotlib.rc('font', **font)
-
+        
         for i in xrange(d): 
             for j in xrange(d): 
                 mus[0]
@@ -124,6 +126,7 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
                     axes[i,j].yaxis.set_tick_params(width=1)
         plt.savefig("%s/%s_i_cors_%d_%d_bps.pdf"%(outdir, contig, min_s, max_e))
         plt.gcf().clear()
+        """
 
     return c, off_diag
 
@@ -350,6 +353,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.
 
     t = time.time()
     print "getting var chunks..."
+    #THIS IS EATING UP TIME
     CNV_segs, CNV_gXs = filter_invariant_segs(s_e_segs, g, contig) 
     print "got var chunks in %fs"%(time.time()-t)
     
@@ -776,22 +780,28 @@ class GMM_gt(object):
         
         return False
         
-def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plot=False):
+def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plot=False, v=False):
 
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs)
+    if gX.fail_filter(filt):
+        print "***********FAILED************"
+    if gX.n_clusts ==1:  
+        print "***********1_CLUST************"
+
     if gX.n_clusts == 1 or gX.fail_filter(filt):
         return
 
     F_call.write("%s\t%d\t%d\n"%(contig, s, e))
-    g.output(F_gt, gX, contig, s, e, v=False)
+    g.output(F_gt, gX, contig, s, e, v=v)
     gX.output_filter_data(F_filt, contig, s, e)
     
     if plot:
         print "plotting %s %d %d"%(contig, s, e)
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
         gXs = g.GMM_genotype(Xs, include_indivs)
-        g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./plotting/test/%s_%d_%d.pdf"%(contig, s, e))
+        print g.pw_GMM_overlap(gX.gmm)
+        g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./plotting/test/%s_%d_%d.png"%(contig, s, e))
 
 
 class genotyper:
@@ -823,6 +833,11 @@ class genotyper:
                 ordered_gts.append(-1)
         outstr = "%s\t%s\n"%(outstr, "\t".join("%d"%gt for gt in ordered_gts))
         if v:
+            """
+            for indiv in self.indivs:
+                if indiv in gts_by_indiv:
+                   print indiv, gts_by_indiv[indiv]
+            """
             print outstr
 
         FOUT.write(outstr)
@@ -1058,12 +1073,12 @@ class genotyper:
         t = time.time()
 
         prev_grps = np.array([])
-        for k in np.arange(.2, 0.7,  0.001):
+        #for k in np.arange(.2, 0.7,  0.001):
+        for k in np.arange(.3, 1.5,  0.001):
             grps = hclust.fcluster(Z, k, criterion='distance')
             if np.all(grps == prev_grps): continue
 
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
-            print init_vars
 
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 

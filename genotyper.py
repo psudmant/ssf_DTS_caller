@@ -1005,8 +1005,8 @@ class genotyper:
                 o1, o2 = os[0], os[1]
                 if o1 == None: o1, o2 = 1.0, 1.0
                 
-                ax.text(x,y,"%.2f"%o[2], fontsize=4)
-                ax.text(x,y-.5,"%.2f"%o[3], fontsize=4)
+                ax.text(x,y,"%.2f"%o1, fontsize=4)
+                ax.text(x,y-.5,"%.2f"%o2, fontsize=4)
             
     def aug_dendrogram(self, ax, ddata):
         for i, d in zip(ddata['icoord'], ddata['dcoord']):

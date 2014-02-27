@@ -585,6 +585,7 @@ class GMM_gt(object):
         return y
 
     def get_intersection(self, G1, G2, ws, tol=0.01):
+        tol = min(ws)/1000
         #sort so G1.mu < G2.mu
         #ui < uj
         oGs = [G1, G2] 
@@ -645,12 +646,12 @@ class GMM_gt(object):
             u_1, u_2 = self.all_uniq_mus[i], self.all_uniq_mus[j]
             l1, l2 =  self.mu_to_labels[u_1], self.mu_to_labels[u_2] 
             s1, s2 = self.label_to_std[l1], self.label_to_std[l2] 
-            G1, G2 = [u_1,s1], [u_2,s2]
+            G1, G2 = [u_1,s1*s1], [u_2,s2*s2]
             w1, w2 = self.weights[i], self.weights[j]
             t = w1+w2
             w1, w2 = w1/t, w2/t
             x, y, o1, o2 = self.get_intersection(G1, G2, [w1,w2], tol=0.01)
-            overlaps.append([tuple([u_1,u_2]),tuple([o1, o2])])
+            overlaps.append({"us":tuple([u_1,u_2]),"os":tuple([o1, o2]),"ss":tuple([s1,s2])})
         
         return overlaps
 
@@ -996,17 +997,23 @@ class genotyper:
             ax.plot(mu,-.001,"^",ms=10,alpha=.7,color=c)
         
         if overlaps!=None:
+            y=ax.get_ylim()[1]-.2
             for o in overlaps:
-                y=ax.get_ylim()[1] +1 
-                us = o[0]
-                os = o[1]
-                x=(us[0]+us[1])/2
+                y-=.4
+                us = o['us']
+                os = o['os']
+                ss = o['ss']
+
+                x=(us[0]+us[1])/2.0
+                d=us[0]-us[1]
+                ds1 = d/ss[0]
+                ds2 = d/ss[1]
 
                 o1, o2 = os[0], os[1]
                 if o1 == None: o1, o2 = 1.0, 1.0
                 
-                ax.text(x,y,"%.2f"%o1, fontsize=4)
-                ax.text(x,y-.5,"%.2f"%o2, fontsize=4)
+                ax.text(x,y,"%.2f %.2f"%(o1, ds1 ), fontsize=6, horizontalalignment='center', verticalalignment='center')
+                ax.text(x,y-.15,"%.2f %.2f"%(o2, ds2 ), fontsize=6, verticalalignment='center', horizontalalignment='center')
             
     def aug_dendrogram(self, ax, ddata):
         for i, d in zip(ddata['icoord'], ddata['dcoord']):
@@ -1123,7 +1130,7 @@ class genotyper:
     def fit_GMM(self, X, init_means, init_vars, init_weights):
     
         n_components = len(init_means)
-        gmm = mixture.GMM(n_components, 'spherical')
+        gmm = mixture.GMM(n_components, 'spherical', min_covar=1e-5)
         gmm.means = np.reshape(np.array(init_means),(len(init_means),1))
         gmm.weights = np.array(init_weights)
         

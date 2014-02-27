@@ -544,6 +544,7 @@ class GMM_gt(object):
         self.params = params
         self.bics = bics
         self.min_bic = min(self.bics)
+        self.weights = self.gmm.weights
         
         self.indivs = indivs 
         self.best_idx = self.bics.index(self.min_bic) 
@@ -572,7 +573,87 @@ class GMM_gt(object):
 
         self.all_uniq_labels = np.array(self.all_uniq_labels)
         self.all_uniq_mus = np.array(self.all_uniq_mus)
-         
+    
+    def eval_G(self, G, x):
+
+        u, v = G
+        s = np.sqrt(v)
+        sq2pi = np.power(2*np.pi,0.5)
+
+        y = (1/(s*sq2pi)) * np.exp( -1*((x-u)*(x-u))/(2*s*s) )
+        #y = mlab.normpdf(x, mu, s)
+        return y
+
+    def get_intersection(self, G1, G2, ws, tol=0.01):
+        #sort so G1.mu < G2.mu
+        #ui < uj
+        oGs = [G1, G2] 
+        ows = ws
+        Gs, ws = [], []
+        args = np.argsort([G1[0],G2[0]])
+        
+        for i in args:
+            Gs.append(oGs[i])
+            ws.append(ows[i])
+        ui, vi = Gs[0]
+        uj, vj = Gs[1]
+        si, sj = np.sqrt(vi), np.sqrt(vj)
+        al, be = ws
+        
+        if si == sj:
+            x=(ui+uj)/2.0
+        else:
+            sq2pi = np.power(2*np.pi,0.5)
+            c = (2*si*si*sj*sj) * ( np.log( al/(si*sq2pi) ) - np.log( be/(sj*sq2pi) ) )
+            c = c  + (si*si*uj*uj)-(sj*sj*ui*ui)
+            b = -((2*uj*si*si)-(2*ui*sj*sj))
+            a = (si*si)-(sj*sj)
+            
+            q=(b**2 - 4*a*c)
+            if q<0: 
+                x=None
+            else:
+                x1 = (-b + np.sqrt(q)) / (2*a)
+                x2 = (-b - np.sqrt(q)) / (2*a)
+                
+                x=x1
+                if (x1 < ui and x1 < uj) or (x1 > ui and x1 > uj):
+                    x=x2
+        
+        if x==None:
+            return None, None, None, None
+
+        y = al*self.eval_G(G1, x) 
+
+        mn = ui - 5*si
+        mx = uj + 5*sj
+        xis = np.arange(x,mx, tol)
+        xjs = np.arange(mn,x, tol)
+
+        i_integral = np.sum(mlab.normpdf(xis, ui, si)*al)*tol
+        j_integral = np.sum(mlab.normpdf(xjs, uj, sj)*be)*tol
+        overlap = i_integral+j_integral
+
+        return x, y, overlap/al, overlap/be
+
+    def assess_GT_overlaps(self):
+
+        sort_mu_args = np.argsort(self.all_uniq_mus)
+        overlaps = []
+        for k in xrange(len(sort_mu_args)-1):
+            i, j = sort_mu_args[k], sort_mu_args[k+1] 
+            u_1, u_2 = self.all_uniq_mus[i], self.all_uniq_mus[j]
+            l1, l2 =  self.mu_to_labels[u_1], self.mu_to_labels[u_2] 
+            s1, s2 = self.label_to_std[l1], self.label_to_std[l2] 
+            G1, G2 = [u_1,s1], [u_2,s2]
+            w1, w2 = self.weights[i], self.weights[j]
+            t = w1+w2
+            w1, w2 = w1/t, w2/t
+            x, y, o1, o2 = self.get_intersection(G1, G2, [w1,w2], tol=0.01)
+            overlaps.append([tuple([u_1,u_2]),tuple([o1, o2])])
+        
+        return overlaps
+
     def correct_order_proportion(self):
         #wnd_proportion_dir
         sorted_mus = np.sort(self.all_uniq_mus)
@@ -796,12 +877,13 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plo
     g.output(F_gt, gX, contig, s, e, v=v)
     gX.output_filter_data(F_filt, contig, s, e)
     
+    
     if plot:
         print "plotting %s %d %d"%(contig, s, e)
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
         gXs = g.GMM_genotype(Xs, include_indivs)
-        print g.pw_GMM_overlap(gX.gmm)
-        g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, fn="./plotting/test/%s_%d_%d.png"%(contig, s, e))
+        overlaps = gX.assess_GT_overlaps()
+        g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, overlaps, fn="./plotting/test/%s_%d_%d.png"%(contig, s, e))
 
 
 class genotyper:
@@ -898,7 +980,7 @@ class genotyper:
         t = time.time()
         print >>stderr, "done (%fs)"%(time.time()-t)
        
-    def addGMM(self, gmm, ax, X):
+    def addGMM(self, gmm, ax, X, overlaps=None):
         
         G_x=np.arange(0,max(X)+1,.1)
         l = gmm.means.shape[0] 
@@ -912,6 +994,19 @@ class genotyper:
             G_y = mlab.normpdf(G_x, mu, var**.5)*gmm.weights[i]
             ax.plot(G_x,G_y,color=c)
             ax.plot(mu,-.001,"^",ms=10,alpha=.7,color=c)
+        
+        if overlaps!=None:
+            for o in overlaps:
+                y=ax.get_ylim()[1] +1 
+                us = o[0]
+                os = o[1]
+                x=(us[0]+us[1])/2
+
+                o1, o2 = os[0], os[1]
+                if o1 == None: o1, o2 = 1.0, 1.0
+                
+                ax.text(x,y,"%.2f"%o[2], fontsize=4)
+                ax.text(x,y-.5,"%.2f"%o[3], fontsize=4)
             
     def aug_dendrogram(self, ax, ddata):
         for i, d in zip(ddata['icoord'], ddata['dcoord']):
@@ -922,7 +1017,7 @@ class genotyper:
                          textcoords='offset points',
                          va='top', ha='center')
 
-    def plot(self, gX, gXs, chr, start, end, idx_s, idx_e, s_idx_s, s_idx_e, fn="test_gt.pdf"):
+    def plot(self, gX, gXs, chr, start, end, idx_s, idx_e, s_idx_s, s_idx_e, overlaps, fn="test_gt.pdf"):
         
         X = gX.X
         Xs = gXs.X
@@ -941,7 +1036,7 @@ class genotyper:
         axarr[0,0].set_ylim(-0.10,max(sunk_cps)+1)
         
         n, bins, patches = axarr[1,1].hist(cps,alpha=.9,ec='none',normed=1,color='r',bins=len(cps)/10)
-        self.addGMM(gX.gmm, axarr[1,1], cps)
+        self.addGMM(gX.gmm, axarr[1,1], cps, overlaps)
         fig.sca(axarr[0,2]) 
         dendro = hclust.dendrogram(gX.Z, orientation='right')
         #self.aug_dendrogram(axarr[0,2], dendro)
@@ -1043,68 +1138,7 @@ class genotyper:
         
         return gmm, labels, bic 
     
-    def eval_G(G, x):
 
-        u, v = G
-        s = np.sqrt(v)
-        sq2pi = np.power(2*np.pi,0.5)
-
-        y = (1/(s*sq2pi)) * np.exp( -1*((x-u)*(x-u))/(2*s*s) )
-        #y = mlab.normpdf(x, mu, s)
-        return y
-
-    def get_intersection(G1, G2, ws, tol=0.01):
-        #sort so G1.mu < G2.mu
-        #ui < uj
-        oGs = [G1, G2] 
-        ows = ws
-        Gs, ws = [], []
-        args = np.argsort([G1[0],G2[0]])
-        
-        for i in args:
-            Gs.append(oGs[i])
-            ws.append(ows[i])
-        ui, vi = Gs[0]
-        uj, vj = Gs[1]
-        si, sj = np.sqrt(vi), np.sqrt(vj)
-        al, be = ws
-        print ui, si, uj, sj
-        
-        if si == sj:
-            x=(ui+uj)/2.0
-        else:
-            sq2pi = np.power(2*np.pi,0.5)
-            c = (2*si*si*sj*sj) * ( np.log( al/(si*sq2pi) ) - np.log( be/(sj*sq2pi) ) )
-            c = c  + (si*si*uj*uj)-(sj*sj*ui*ui)
-            b = -((2*uj*si*si)-(2*ui*sj*sj))
-            a = (si*si)-(sj*sj)
-            
-            q=(b**2 - 4*a*c)
-            if q<0: 
-                x=None
-            else:
-                x1 = (-b + np.sqrt(q)) / (2*a)
-                x2 = (-b - np.sqrt(q)) / (2*a)
-                
-                x=x1
-                if (x1 < ui and x1 < uj) or (x1 > ui and x1 > uj):
-                    x=x2
-        
-        if x==None:
-            return None, None, None, None
-
-        y = al*eval_G(G1, x) 
-
-        mn = ui - 5*si
-        mx = uj + 5*sj
-        xis = np.arange(x,mx, tol)
-        xjs = np.arange(mn,x, tol)
-
-        i_integral = np.sum(mlab.normpdf(xis, ui, si)*al)*tol
-        j_integral = np.sum(mlab.normpdf(xjs, uj, sj)*be)*tol
-        overlap = i_integral+j_integral
-
-        return x, y, overlap/al, overlap/be
     def GMM_genotype(self, X, include_indivs = None, FOUT = None):
         """
         GMM genotyping

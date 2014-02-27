@@ -1073,7 +1073,6 @@ class genotyper:
         t = time.time()
 
         prev_grps = np.array([])
-        #for k in np.arange(.2, 0.7,  0.001):
         for k in np.arange(.3, 1.5,  0.001):
             grps = hclust.fcluster(Z, k, criterion='distance')
             if np.all(grps == prev_grps): continue

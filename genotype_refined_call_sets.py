@@ -28,11 +28,6 @@ if __name__=='__main__':
 
     opts.add_option('','--gglob_dir',dest='gglob_dir')
     opts.add_option('','--dup_tabix',dest='fn_dup_tabix')
-    #opts.add_option('','--in_DTS_dir',dest='in_DTS_dir')
-    #opts.add_option('','--in_sunk_DTS_dir',dest='in_sunk_DTS_dir')
-    #opts.add_option('','--contigs',dest='fn_contigs')
-    #opts.add_option('','--sunk_contigs',dest='fn_sunk_contigs')
-    #opts.add_option('','--GC_contents_dir',dest='GC_contents_dir')
     opts.add_option('','--genotype_output',dest='fn_gt_out')
     opts.add_option('','--call_output',dest='fn_call_out')
     opts.add_option('','--contig',dest='contig')

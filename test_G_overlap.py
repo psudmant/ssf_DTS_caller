@@ -95,10 +95,8 @@ def get_intersection(G1, G2, ws, tol=0.01):
 
     i_integral = np.sum(mlab.normpdf(xis, ui, si)*al)*tol
     j_integral = np.sum(mlab.normpdf(xjs, uj, sj)*be)*tol
-    #print "i int:", i_integral
-    #print "j int:", j_integral
     overlap = i_integral+j_integral
-    #print overlap
+
     return x, y, overlap/al, overlap/be
 
 def plot_G(ax, Gs, weights, intersect):

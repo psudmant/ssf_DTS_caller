@@ -43,6 +43,15 @@ if __name__=='__main__':
     opts.add_option('','--subset_indivs',dest='subset_indivs', default=None)
     
     opts.add_option('','--do_plot',dest='do_plot',action="store_true",default=False)
+
+    opts.add_option('','--simplify_complex_eval',
+                    dest='simplify_complex_eval',
+                    action="store_true",
+                    default=False,
+                    help="""complex loci are those where multiple calls overlap
+                            The procedure to determine overlappping set of calls and assign
+                            each uniquely to a set of individuals is long and works only 
+                            really well for high-coverage genomes""")
     
     (o, args) = opts.parse_args()
     
@@ -73,7 +82,7 @@ if __name__=='__main__':
         mn, mx = get_min_max(overlapping_call_clusts)
            
         #if contig == "chr2" and not (mx>=242817287 and mn<=243191022): continue
-        #if contig == "chr20" and not (mx>=1548059 and mn<=1601096): continue
+        #if contig == "chr20" and not (mx>=17543718 and mn<=17551800): continue
         #if contig == "chr6" and not (mx>=151476852 and mn<=151495535): continue
          
         """
@@ -83,12 +92,14 @@ if __name__=='__main__':
         """
         k+=1
 
-        if k%100==0: print "%d genotypes evaluated..."%k
+        if k%1==0: 
+            print "".join("*" for q in xrange(50))
+            print "%d genotypes evaluated..."%k
         
-        if len(overlapping_call_clusts) == 1:
-            c = overlapping_call_clusts[0]
-            start, end = c.get_med_start_end()
-            gt.output(g, contig, start, end, F_gt, F_call, F_filt, filt, plot=do_plot)  
+        if len(overlapping_call_clusts) == 1 or o.simplify_complex_eval:
+            for c in overlapping_call_clusts:
+                start, end = c.get_med_start_end()
+                gt.output(g, contig, start, end, F_gt, F_call, F_filt, filt, plot=do_plot,v=False)  
         else:
             s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=do_plot)
             

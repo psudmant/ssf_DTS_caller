@@ -1042,7 +1042,69 @@ class genotyper:
         aic = -2*gmm.score(X).sum() + 2*(3*n_components)
         
         return gmm, labels, bic 
+    
+    def eval_G(G, x):
 
+        u, v = G
+        s = np.sqrt(v)
+        sq2pi = np.power(2*np.pi,0.5)
+
+        y = (1/(s*sq2pi)) * np.exp( -1*((x-u)*(x-u))/(2*s*s) )
+        #y = mlab.normpdf(x, mu, s)
+        return y
+
+    def get_intersection(G1, G2, ws, tol=0.01):
+        #sort so G1.mu < G2.mu
+        #ui < uj
+        oGs = [G1, G2] 
+        ows = ws
+        Gs, ws = [], []
+        args = np.argsort([G1[0],G2[0]])
+        
+        for i in args:
+            Gs.append(oGs[i])
+            ws.append(ows[i])
+        ui, vi = Gs[0]
+        uj, vj = Gs[1]
+        si, sj = np.sqrt(vi), np.sqrt(vj)
+        al, be = ws
+        print ui, si, uj, sj
+        
+        if si == sj:
+            x=(ui+uj)/2.0
+        else:
+            sq2pi = np.power(2*np.pi,0.5)
+            c = (2*si*si*sj*sj) * ( np.log( al/(si*sq2pi) ) - np.log( be/(sj*sq2pi) ) )
+            c = c  + (si*si*uj*uj)-(sj*sj*ui*ui)
+            b = -((2*uj*si*si)-(2*ui*sj*sj))
+            a = (si*si)-(sj*sj)
+            
+            q=(b**2 - 4*a*c)
+            if q<0: 
+                x=None
+            else:
+                x1 = (-b + np.sqrt(q)) / (2*a)
+                x2 = (-b - np.sqrt(q)) / (2*a)
+                
+                x=x1
+                if (x1 < ui and x1 < uj) or (x1 > ui and x1 > uj):
+                    x=x2
+        
+        if x==None:
+            return None, None, None, None
+
+        y = al*eval_G(G1, x) 
+
+        mn = ui - 5*si
+        mx = uj + 5*sj
+        xis = np.arange(x,mx, tol)
+        xjs = np.arange(mn,x, tol)
+
+        i_integral = np.sum(mlab.normpdf(xis, ui, si)*al)*tol
+        j_integral = np.sum(mlab.normpdf(xjs, uj, sj)*be)*tol
+        overlap = i_integral+j_integral
+
+        return x, y, overlap/al, overlap/be
     def GMM_genotype(self, X, include_indivs = None, FOUT = None):
         """
         GMM genotyping

@@ -1125,62 +1125,6 @@ class genotyper:
             init_weights.append(float(np.sum(grps==grp))/l)
         
         return init_mus, init_vars, init_weights
-        
-    def __pw_GMM_overlap(self, gmm):
-        """
-        DEPRECATED - incorrect
-        """
-        
-        overlaps = []       
-        mus = gmm.means[:,0]
-        vars = np.array([v[0][0] for v in gmm.covars])
-        weights = np.array(gmm.weights)
-        order = np.argsort(mus)
-        mus = mus[order]
-        weights = weights[order]
-        vars = vars[order]
-        
-        for i in xrange(mus.shape[0]-1):
-            mu1 = mus[i]
-            mu2 = mus[i+1]
-            v1 = vars[i]
-            v2 = vars[i+1]
-            sd_max = np.sqrt(max(v1, v2))
-            mn = min(mu1, mu2) - 10*sd_max
-            mx = max(mu1, mu2) + 10*sd_max
-            xs = np.arange(mn,mx,0.01)
-            o = np.sum(np.min(np.c_[norm.pdf(xs,loc=mu1,scale=v1)*weights[i], 
-                                    norm.pdf(xs,loc=mu2,scale=v2)*weights[i+1]], 1))  * 0.01
-            overlaps.append([o,o/weights[i],o/weights[i+1]])
-        return overlaps
-    
-    def __plot(self, Z, cutoff):
-        
-        dendro = hclust.dendrogram(Z, orientation='right', labels = lbls, color_threshold = cutoff)
-        grps = hclust.fcluster(Z, cutoff, criterion='distance')
-        
-        plt.gcf().set_size_inches(14,6)
-        ax=plt.gcf().gca()
-        ax.set_position([.05,0.05,.3,.9])
-
-        ax2 = plt.gcf().add_axes([.55,.05,.4,.9])
-        k = 0
-        colors = ['b','g','r','c','m','y','k']
-        n_colors = len(colors)
-
-        for clust in Set(list(grps)):
-            for idx in np.where(grps == clust)[0]:
-                ax2.plot([self.calls[idx]['start'], self.calls[idx]['end']],
-                         [k,k], 
-                         lw=1,
-                         color=colors[(clust-1)%n_colors])
-                k+=1.2
-          
-        ax2.set_xlim([min(self.all_starts),max(self.all_ends)])
-        ax2.set_ylim([-1,k+1])
-
-        plt.savefig('test.png')
-        plt.gcf().clear()
 
     def ms_genotype(self, X):
         """

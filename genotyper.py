@@ -879,7 +879,7 @@ def assess_GT_overlaps(gmm):
         w1, w2 = ws[i], ws[j]
         t = w1+w2
         w1, w2 = w1/t, w2/t
-        x, y, o1, o2 = self.get_intersection(G1, G2, [w1,w2], tol=0.01)
+        x, y, o1, o2 = get_intersection(G1, G2, [w1,w2], tol=0.01)
         all_os+=[o1,o2]
         overlaps.append({"us":tuple([u_1,u_2]),"os":tuple([o1, o2]),"ss":tuple([s1,s2]), "ws":tuple([w1,w2])})
     

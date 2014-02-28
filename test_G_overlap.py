@@ -136,8 +136,8 @@ if __name__=="__main__":
     Gs = [[2,.1], [3,.1]]
     weights = [.5,.5]
     
-    Gs = [[.8,.0002], [1.2,.001]]
-    weights = [.4,.6]
+    Gs = [[1.96,.3*.3], [2.8,.17*.17]]
+    weights = [.85,.15]
     
     ix,iy, fi, fj = get_intersection(Gs[0], Gs[1], weights, tol=0.001)
     print ix, iy, fi, fj

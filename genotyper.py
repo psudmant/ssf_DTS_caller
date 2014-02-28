@@ -583,115 +583,6 @@ class GMM_gt(object):
         self.all_uniq_mus = np.array(self.all_uniq_mus)
 
     
-    def eval_G(self, G, x):
-
-        u, v = G
-        s = np.sqrt(v)
-        sq2pi = np.power(2*np.pi,0.5)
-
-        y = (1/(s*sq2pi)) * np.exp( -1*((x-u)*(x-u))/(2*s*s) )
-        #y = mlab.normpdf(x, mu, s)
-        return y
-
-    def get_intersection(self, G1, G2, ws, tol=0.01):
-        tol = min(ws)/1000
-        #sort so G1.mu < G2.mu
-        #ui < uj
-        oGs = [G1, G2] 
-        ows = ws
-        Gs, ws = [], []
-        args = np.argsort([G1[0],G2[0]])
-        
-        for i in args:
-            Gs.append(oGs[i])
-            ws.append(ows[i])
-        ui, vi = Gs[0]
-        uj, vj = Gs[1]
-        si, sj = np.sqrt(vi), np.sqrt(vj)
-        al, be = ws
-        
-        if si == sj:
-            x=(ui+uj)/2.0
-        else:
-            sq2pi = np.power(2*np.pi,0.5)
-            c = (2*si*si*sj*sj) * ( np.log( al/(si*sq2pi) ) - np.log( be/(sj*sq2pi) ) )
-            c = c  + (si*si*uj*uj)-(sj*sj*ui*ui)
-            b = -((2*uj*si*si)-(2*ui*sj*sj))
-            a = (si*si)-(sj*sj)
-            
-            q=(b**2 - 4*a*c)
-            if q<0: 
-                x=None
-            else:
-                x1 = (-b + np.sqrt(q)) / (2*a)
-                x2 = (-b - np.sqrt(q)) / (2*a)
-                
-                x=x1
-                if (x1 < ui and x1 < uj) or (x1 > ui and x1 > uj):
-                    x=x2
-        
-        if x==None:
-            return None, None, 1, 1 
-
-        y = al*self.eval_G(G1, x) 
-
-        mn = ui - 5*si
-        mx = uj + 5*sj
-        xis = np.arange(x,mx, tol)
-        xjs = np.arange(mn,x, tol)
-
-        i_integral = np.sum(mlab.normpdf(xis, ui, si)*al)*tol
-        j_integral = np.sum(mlab.normpdf(xjs, uj, sj)*be)*tol
-        overlap = i_integral+j_integral
-
-        return x, y, overlap/al, overlap/be
-
-    def assess_GT_overlaps(self):
-
-        overlaps = []
-        """
-        Based on mu/sds of ACTUAL data, not G fits
-        """
-        #for k in xrange(len(sort_mu_args)-1):
-        #    i, j = sort_mu_args[k], sort_mu_args[k+1] 
-        #    u_1, u_2 = self.all_uniq_mus[i], self.all_uniq_mus[j]
-        #    l1, l2 =  self.mu_to_labels[u_1], self.mu_to_labels[u_2] 
-        #    s1, s2 = self.label_to_std[l1], self.label_to_std[l2] 
-        #    G1, G2 = [u_1,s1*s1], [u_2,s2*s2]
-        #    w1, w2 = self.weights[i], self.weights[j]
-        #    t = w1+w2
-        #    w1, w2 = w1/t, w2/t
-        #    x, y, o1, o2 = self.get_intersection(G1, G2, [w1,w2], tol=0.01)
-        #    overlaps.append({"us":tuple([u_1,u_2]),"os":tuple([o1, o2]),"ss":tuple([s1,s2]), "ws":tuple([w1,w2])})
-
-        l = self.gmm.means.shape[0] 
-        us = []
-        ss = []
-        ws = []
-        for i in xrange(l):
-            u = self.gmm.means[i,0]
-            s = self.gmm.covars[i][0][0]**.5
-            w = self.gmm.weights[i]
-            us.append(u)
-            ss.append(s)
-            ws.append(w)
-        
-        sort_mu_args = np.argsort(np.array(us))
-        all_os = []
-        for k in xrange(len(sort_mu_args)-1):
-            i, j = sort_mu_args[k], sort_mu_args[k+1] 
-            u_1, u_2 = us[i], us[j]
-            s1, s2 = ss[i], ss[j]
-            G1, G2 = [u_1,s1*s1], [u_2,s2*s2]
-            w1, w2 = ws[i], ws[j]
-            t = w1+w2
-            w1, w2 = w1/t, w2/t
-            x, y, o1, o2 = self.get_intersection(G1, G2, [w1,w2], tol=0.01)
-            all_os+=[o1,o2]
-            overlaps.append({"us":tuple([u_1,u_2]),"os":tuple([o1, o2]),"ss":tuple([s1,s2]), "ws":tuple([w1,w2])})
-        
-        u_o, med_o = np.mean(all_os), np.median(all_os)
-        return u_o, med_o, overlaps
 
     def correct_order_proportion(self):
         #wnd_proportion_dir
@@ -899,12 +790,108 @@ class GMM_gt(object):
                 return True
         
         return False
+
+def eval_G(G, x):
+
+    u, v = G
+    s = np.sqrt(v)
+    sq2pi = np.power(2*np.pi,0.5)
+
+    y = (1/(s*sq2pi)) * np.exp( -1*((x-u)*(x-u))/(2*s*s) )
+    return y
+
+def get_intersection(G1, G2, ws, tol=0.01):
+    tol = min(ws)/1000
+    #sort so G1.mu < G2.mu
+    #ui < uj
+    oGs = [G1, G2] 
+    ows = ws
+    Gs, ws = [], []
+    args = np.argsort([G1[0],G2[0]])
+    
+    for i in args:
+        Gs.append(oGs[i])
+        ws.append(ows[i])
+    ui, vi = Gs[0]
+    uj, vj = Gs[1]
+    si, sj = np.sqrt(vi), np.sqrt(vj)
+    al, be = ws
+    
+    if si == sj:
+        x=(ui+uj)/2.0
+    else:
+        sq2pi = np.power(2*np.pi,0.5)
+        c = (2*si*si*sj*sj) * ( np.log( al/(si*sq2pi) ) - np.log( be/(sj*sq2pi) ) )
+        c = c  + (si*si*uj*uj)-(sj*sj*ui*ui)
+        b = -((2*uj*si*si)-(2*ui*sj*sj))
+        a = (si*si)-(sj*sj)
+        
+        q=(b**2 - 4*a*c)
+        if q<0: 
+            x=None
+        else:
+            x1 = (-b + np.sqrt(q)) / (2*a)
+            x2 = (-b - np.sqrt(q)) / (2*a)
+            
+            x=x1
+            if (x1 < ui and x1 < uj) or (x1 > ui and x1 > uj):
+                x=x2
+    
+    if x==None:
+        return None, None, 1, 1 
+
+    y = al*eval_G(G1, x) 
+
+    mn = ui - 5*si
+    mx = uj + 5*sj
+    xis = np.arange(x,mx, tol)
+    xjs = np.arange(mn,x, tol)
+
+    i_integral = np.sum(mlab.normpdf(xis, ui, si)*al)*tol
+    j_integral = np.sum(mlab.normpdf(xjs, uj, sj)*be)*tol
+    overlap = i_integral+j_integral
+
+    return x, y, overlap/al, overlap/be
+
+def assess_GT_overlaps(gmm):
+
+    overlaps = []
+
+    l = gmm.means.shape[0] 
+    us = []
+    ss = []
+    ws = []
+    for i in xrange(l):
+        u = gmm.means[i,0]
+        s = gmm.covars[i][0][0]**.5
+        w = gmm.weights[i]
+        us.append(u)
+        ss.append(s)
+        ws.append(w)
+    
+    sort_mu_args = np.argsort(np.array(us))
+    all_os = []
+    for k in xrange(len(sort_mu_args)-1):
+        i, j = sort_mu_args[k], sort_mu_args[k+1] 
+        u_1, u_2 = us[i], us[j]
+        s1, s2 = ss[i], ss[j]
+        G1, G2 = [u_1,s1*s1], [u_2,s2*s2]
+        w1, w2 = ws[i], ws[j]
+        t = w1+w2
+        w1, w2 = w1/t, w2/t
+        x, y, o1, o2 = self.get_intersection(G1, G2, [w1,w2], tol=0.01)
+        all_os+=[o1,o2]
+        overlaps.append({"us":tuple([u_1,u_2]),"os":tuple([o1, o2]),"ss":tuple([s1,s2]), "ws":tuple([w1,w2])})
+    
+    u_o, med_o = np.mean(all_os), np.median(all_os)
+    return u_o, med_o, overlaps
+    
         
 def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plot=False, v=False):
 
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs)
-    u_o, med_o, overlaps = gX.assess_GT_overlaps()
+    u_o, med_o, overlaps = assess_GT_overlaps(gX.gmm)
 
     if gX.fail_filter(filt):
         print "***********FAILED************"
@@ -923,7 +910,6 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plo
         print "plotting %s %d %d"%(contig, s, e)
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
         gXs = g.GMM_genotype(Xs, include_indivs)
-        #g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, overlaps, fn="./plotting/test/%s_%d_%d.png"%(contig, s, e))
         g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, overlaps, fn="./plotting/test/%s_%d_%d.png"%(contig, s, e))
 
 
@@ -1194,11 +1180,12 @@ class genotyper:
         return gmm, labels, bic 
     
 
-    def GMM_genotype(self, X, include_indivs = None, FOUT = None):
+    def GMM_genotype(self, X, merge_overlap_thresh=-1 include_indivs = None, FOUT = None):
         """
         GMM genotyping
-        begin by subsetting X to those indivs you want
-        #cv_types = ['spherical', 'tied', 'diag', 'full']
+        merge_overlap_thresh, if -1, don't ever merge, however, 
+        otherwise, if overlap > merge_overlap_thresh, then merge and recalculate 
+
         """
          
         if include_indivs:
@@ -1234,8 +1221,8 @@ class genotyper:
 
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 
-            ###IF REFIT TEST ALL PAIRWISE
-
+            if merge_overlap_thresh!=-1:
+                print "do some work"
 
             params.append(len(init_mus))
             bics.append(ic)

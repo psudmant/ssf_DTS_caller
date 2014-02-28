@@ -529,9 +529,17 @@ def get_best_gt(call, contig, g):
     
 
 class filter_obj:
-    def __init__(self, min_max_mu_d, min_med_med):
+    def __init__(self, min_max_mu_d, max_mu_overlap):
+        """
+        min_max_mu_d - the minumum acceptible distance between gaussians for
+        the maximum distance of any fit - ie, make sure that there is at least 
+        one pair of adjacent guassians that looks at least this good
+
+        max_mu_overlap - the maximum mean of the overlaps between
+        adjacent fit gaussians to be accepted
+        """
         self.min_max_mu_d = min_max_mu_d
-        self.min_med_med = min_med_med
+        self.max_mu_overlap = max_mu_overlap
         
 class GMM_gt(object):
 
@@ -623,7 +631,7 @@ class GMM_gt(object):
                     x=x2
         
         if x==None:
-            return None, None, None, None
+            return None, None, 1, 1 
 
         y = al*self.eval_G(G1, x) 
 
@@ -1168,8 +1176,9 @@ class genotyper:
     def fit_GMM(self, X, init_means, init_vars, init_weights):
     
         n_components = len(init_means)
-        gmm = mixture.GMM(n_components, 'spherical')
-        #gmm = mixture.GMM(n_components, 'spherical', min_covar=1e-5)
+        #gmm = mixture.GMM(n_components, 'spherical')
+        #gmm = mixture.GMM(n_components, 'diag')
+        gmm = mixture.GMM(n_components, 'spherical', min_covar=1e-10)
         gmm.means = np.reshape(np.array(init_means),(len(init_means),1))
         gmm.weights = np.array(init_weights)
         
@@ -1224,6 +1233,9 @@ class genotyper:
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
 
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
+
+            ###IF REFIT TEST ALL PAIRWISE
+
 
             params.append(len(init_mus))
             bics.append(ic)

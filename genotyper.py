@@ -865,6 +865,7 @@ def assess_GT_overlaps(gmm):
         u = gmm.means[i,0]
         s = gmm.covars[i][0][0]**.5
         w = gmm.weights[i]
+        if w==0: continue
         us.append(u)
         ss.append(s)
         ws.append(w)
@@ -1088,8 +1089,8 @@ class genotyper:
         if np.sum(np.isnan(sunk_cps)) == 0:
             n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,color='#FCDE8D',bins=len(cps)/10)
             self.addGMM(gXs.gmm, axarr[1,0], sunk_cps)
-            axarr[0,1].plot(gX.params, gX.bics, 'ro', ms=.4)
-            axarr[0,1].plot(gXs.params, gXs.bics, 'go', ms=.4)
+            axarr[0,1].plot(gX.params, gX.bics, 'ro', ms=5)
+            axarr[0,1].plot(gXs.params, gXs.bics, 'go', ms=5)
         
         fig.sca(axarr[1,2]) 
         dendro = hclust.dendrogram(gXs.Z, orientation='right')
@@ -1166,7 +1167,7 @@ class genotyper:
     def s_score(self, X, labels):
         return metrics.silhouette_score(X, labels) 
     
-    def fit_GMM(self, X, init_means, init_vars, init_weights):
+    def fit_GMM(self, X, init_means, init_vars, init_weights, n_iter=1000):
     
         n_components = len(init_means)
         #gmm = mixture.GMM(n_components, 'spherical')
@@ -1178,7 +1179,7 @@ class genotyper:
         #vars = np.array([v[0][0] for v in gmm.covars])
         #gmm.covars = np.reshape()
 
-        gmm.fit(X, n_iter=1000, init_params='c')
+        gmm.fit(X, n_iter=n_iter, init_params='c')
         labels = gmm.predict(X)
         
         bic = -2*gmm.score(X).sum() + (3*n_components)*np.log(X.shape[0])
@@ -1228,13 +1229,14 @@ class genotyper:
 
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 
-            params.append(np.unique(labels).shape[0])
+            #params.append(np.unique(labels).shape[0])
+            params.append(len(init_mus))
             bics.append(ic)
             gmms.append(gmm)
             all_labels.append(labels)
             prev_grps = grps 
                 
-            ##ALSO ADD THESE GUYS
+            ##see if by removing overlapping calls we can improve the fit
             if merge_overlap_thresh!=-1 and np.unique(labels).shape[0]>1:
                 #import pdb; pdf.set_trace()
                 u_o, med_o, overlaps = assess_GT_overlaps(gmm)
@@ -1245,28 +1247,36 @@ class genotyper:
                     l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
                     labels[labels==l2] = l1
                     init_mus, init_vars, init_weights = self.initialize(mus, labels) 
+
+                    gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=0)
+                    #params.append(np.unique(labels).shape[0])
+                    params.append(len(init_mus))
+                    bics.append(ic)
+                    gmms.append(gmm)
+                    all_labels.append(labels)
+
                     gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
+
                     if np.unique(labels).shape[0]==1: break
 
                     u_o, med_o, overlaps = assess_GT_overlaps(gmm)
                     max_ostat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
-                    #print np.unique(labels)
-                    #print "\t",max(max_ostat['os'])
 
-                params.append(np.unique(labels).shape[0])
+                #params.append(np.unique(labels).shape[0])
+                params.append(len(init_mus))
                 bics.append(ic)
                 gmms.append(gmm)
                 all_labels.append(labels)
                     
 
         print "done %fs"%(time.time()-t)
-        grps = np.zeros(mus.shape[0])
-        init_mus, init_vars, init_weights = self.initialize(mus, grps) 
-        gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
-        params.append(len(init_mus))
-        bics.append(ic)
-        gmms.append(gmm)
-        all_labels.append(labels)
+        #grps = np.zeros(mus.shape[0])
+        #init_mus, init_vars, init_weights = self.initialize(mus, grps) 
+        #gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
+        #params.append(len(init_mus))
+        #bics.append(ic)
+        #gmms.append(gmm)
+        #all_labels.append(labels)
         
         #overlaps = self.pw_GMM_overlap(gmm)
         
@@ -1276,12 +1286,14 @@ class genotyper:
         gmm = gmms[idx]
         labels = all_labels[idx]
 
+        print 'len: bics', len(bics)
+        print 'len: gmms', len(gmms)
+        print 'best bic', bics[idx]
+
         if include_indivs == None: 
             include_indivs = self.indivs
             
         return GMM_gt(X, gmm, labels, Z, params, bics, include_indivs)
-        #return gmm, labels, Z, [params, bics]
-        #return gmm, labels, Z, [[len(init_mus)], [ic]]
     
     def initialize(self, X, grps):
 

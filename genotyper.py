@@ -1180,7 +1180,7 @@ class genotyper:
         return gmm, labels, bic 
     
 
-    def GMM_genotype(self, X, merge_overlap_thresh=-1 include_indivs = None, FOUT = None):
+    def GMM_genotype(self, X, merge_overlap_thresh=-1, include_indivs = None, FOUT = None):
         """
         GMM genotyping
         merge_overlap_thresh, if -1, don't ever merge, however, 

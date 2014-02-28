@@ -1088,8 +1088,8 @@ class genotyper:
         if np.sum(np.isnan(sunk_cps)) == 0:
             n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,color='#FCDE8D',bins=len(cps)/10)
             self.addGMM(gXs.gmm, axarr[1,0], sunk_cps)
-            axarr[0,1].plot(gX.params, gX.bics, 'ro-')
-            axarr[0,1].plot(gXs.params, gXs.bics, 'go-')
+            axarr[0,1].plot(gX.params, gX.bics, 'ro', ms=.4)
+            axarr[0,1].plot(gXs.params, gXs.bics, 'go', ms=.4)
         
         fig.sca(axarr[1,2]) 
         dendro = hclust.dendrogram(gXs.Z, orientation='right')
@@ -1228,30 +1228,36 @@ class genotyper:
 
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 
-            #if merge_overlap_thresh!=-1 and np.unique(labels).shape[0]>1:
-            #    u_o, med_o, overlaps = assess_GT_overlaps(gmm)
-            #    max_ostat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
-            #    
-            #    print np.unique(labels)
-            #    print "\t",max(max_ostat['os'])
-            #    while max(max_ostat['os']) > merge_overlap_thresh:
-            #        u1, u2 = max_ostat['us'] 
-            #        l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
-            #        labels[labels==l2] = l1
-            #        init_mus, init_vars, init_weights = self.initialize(mus, labels) 
-            #        gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
-            #        if np.unique(labels).shape[0]==1: break
-
-            #        u_o, med_o, overlaps = assess_GT_overlaps(gmm)
-            #        max_ostat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
-            #        print np.unique(labels)
-            #        print "\t",max(max_ostat['os'])
-                    
             params.append(np.unique(labels).shape[0])
             bics.append(ic)
             gmms.append(gmm)
             all_labels.append(labels)
             prev_grps = grps 
+                
+            ##ALSO ADD THESE GUYS
+            if merge_overlap_thresh!=-1 and np.unique(labels).shape[0]>1:
+                #import pdb; pdf.set_trace()
+                u_o, med_o, overlaps = assess_GT_overlaps(gmm)
+                max_ostat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
+                
+                while max(max_ostat['os']) > merge_overlap_thresh:
+                    u1, u2 = max_ostat['us'] 
+                    l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
+                    labels[labels==l2] = l1
+                    init_mus, init_vars, init_weights = self.initialize(mus, labels) 
+                    gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
+                    if np.unique(labels).shape[0]==1: break
+
+                    u_o, med_o, overlaps = assess_GT_overlaps(gmm)
+                    max_ostat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
+                    #print np.unique(labels)
+                    #print "\t",max(max_ostat['os'])
+
+                params.append(np.unique(labels).shape[0])
+                bics.append(ic)
+                gmms.append(gmm)
+                all_labels.append(labels)
+                    
 
         print "done %fs"%(time.time()-t)
         grps = np.zeros(mus.shape[0])

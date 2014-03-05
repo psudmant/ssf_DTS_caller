@@ -77,7 +77,7 @@ if __name__=='__main__':
         mn, mx = get_min_max(overlapping_call_clusts)
            
         #if contig == "chr2" and not (mx>=242817287 and mn<=243191022): continue
-        if contig == "chr20" and not (mx>=21414607 and mn<=21420616): continue
+        #if contig == "chr20" and not (mx>=16567242 and mn<=16587150): continue
         #if contig == "chr6" and not (mx>=151476852 and mn<=151495535): continue
          
         """
@@ -94,7 +94,8 @@ if __name__=='__main__':
         if len(overlapping_call_clusts) == 1 or o.simplify_complex_eval:
             for c in overlapping_call_clusts:
                 start, end = c.get_med_start_end()
-                if contig == "chr20" and not (mx>=21414607 and mn<=21420616): continue
+                #print start, end
+                #if contig == "chr20" and not (start==16567242 and end==16587150): continue
                 gt.output(g, contig, start, end, F_gt, F_call, F_filt, filt, plot=do_plot,v=False)  
         else:
             s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=do_plot)

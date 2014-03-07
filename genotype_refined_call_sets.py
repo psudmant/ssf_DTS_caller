@@ -48,6 +48,9 @@ if __name__=='__main__':
                             each uniquely to a set of individuals is long and works only 
                             really well for high-coverage genomes""")
     
+    opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=flaot,default=0.5)
+    opts.add_option('','--filter_max_mu_overlap', dest='max_mu_overlap',type=flaot,default=0.5)
+    
     (o, args) = opts.parse_args()
     
     subset_indivs = o.subset_indivs
@@ -71,7 +74,7 @@ if __name__=='__main__':
     g.setup_output(F_gt, F_filt)
     k=-1
 
-    filt = gt.filter_obj(0.5,0.5)
+    filt = gt.filter_obj(o.min_max_mu_d, o.max_mu_overlap)
     
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
         mn, mx = get_min_max(overlapping_call_clusts)

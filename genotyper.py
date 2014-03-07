@@ -1257,12 +1257,63 @@ class genotyper:
         gmm = gmms[idx]
         labels = all_labels[idx]
         ####NOW, finally merge calls that are too close 
+        
+        gmm, labels = self.final_call_merge(gmm, labels, mus) 
 
         if include_indivs == None: 
             include_indivs = self.indivs
             
         return GMM_gt(X, gmm, labels, Z, params, bics, include_indivs)
-    
+
+    def final_call_merge(self, gmm, labels,mus, max_overlap=0.5, min_dist=0.15):
+        """
+        take the final min_bic call and merge calls that are too close   
+        """
+        u_o, med_o, overlaps = assess_GT_overlaps(gmm)
+        max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
+        
+        n_labels = np.unique(labels).shape[0] 
+        while max(max_overlap_stat['os']) > max_overlap and n_labels>1:
+            u1, u2 = max_overlap_stat['us'] 
+            l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
+            labels[labels==l2] = l1
+
+            init_mus, init_vars, init_weights = self.initialize(mus, labels) 
+            gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=0)
+
+            n_labels = np.unique(labels).shape[0] 
+            if n_labels>1:
+                u_o, med_o, overlaps = assess_GT_overlaps(gmm)
+                max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
+        
+        n_labels = np.unique(labels).shape[0] 
+
+        if n_labels==1:
+            return gmm, labels
+        
+        print gmm.means
+
+        u_o, med_o, overlaps = assess_GT_overlaps(gmm)
+        max_overlap_stat = sorted(overlaps, key = lambda x: np.absolute(x['us'][0]-x['us'][1]))[-1]
+        d = np.absolute(max_overlap_stat['us'][0]- max_overlap_stat['us'][1])
+        while d < min_dist and n_labels>1:
+            u1, u2 = max_overlap_stat['us'] 
+            l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
+            labels[labels==l2] = l1
+            
+            init_mus, init_vars, init_weights = self.initialize(mus, labels) 
+            gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=0)
+
+            u_o, med_o, overlaps = assess_GT_overlaps(gmm)
+            print overlaps
+            n_labels = np.unique(labels).shape[0] 
+
+            if n_labels>1:
+                max_overlap_stat = sorted(overlaps, key = lambda x: np.absolute(x['us'][0]-x['us'][1]))[-1]
+                d = np.absolute(max_overlap_stat['us'][0]- max_overlap_stat['us'][1])
+        
+        return gmm, labels
+
     def merge_overlapping_gaussians(self, mus, gmm, labels, merge_overlap_thresh):
         
         params, bics, gmms, all_labels = [], [], [], []
@@ -1271,6 +1322,7 @@ class genotyper:
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         init_mus = None 
         while max(max_overlap_stat['os']) > merge_overlap_thresh:
+            print "ENTER"
             u1, u2 = max_overlap_stat['us'] 
             l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
             

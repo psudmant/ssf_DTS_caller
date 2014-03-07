@@ -48,8 +48,8 @@ if __name__=='__main__':
                             each uniquely to a set of individuals is long and works only 
                             really well for high-coverage genomes""")
     
-    opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=flaot,default=0.5)
-    opts.add_option('','--filter_max_mu_overlap', dest='max_mu_overlap',type=flaot,default=0.5)
+    opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=float,default=0.5)
+    opts.add_option('','--filter_max_mu_overlap', dest='max_mu_overlap',type=float,default=0.5)
     
     (o, args) = opts.parse_args()
     

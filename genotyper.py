@@ -1258,7 +1258,10 @@ class genotyper:
         labels = all_labels[idx]
         ####NOW, finally merge calls that are too close 
         
-        gmm, labels = self.final_call_merge(gmm, labels, mus) 
+        n_labels = np.unique(labels).shape[0] 
+        
+        if n_labels>1:
+            gmm, labels = self.final_call_merge(gmm, labels, mus) 
 
         if include_indivs == None: 
             include_indivs = self.indivs

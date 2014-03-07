@@ -888,10 +888,7 @@ def assess_GT_overlaps(gmm):
     return u_o, med_o, overlaps
     
         
-def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plot=False, v=False):
-
-    merge_overlap_thresh = .1
-    #merge_overlap_thresh = -1
+def output(g, contig, s, e, F_gt, F_call, F_filt, filt, merge_overlap_thresh, include_indivs=None, plot=False, v=False):
 
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs = include_indivs, merge_overlap_thresh=merge_overlap_thresh)

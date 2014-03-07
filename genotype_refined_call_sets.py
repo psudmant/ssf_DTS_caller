@@ -38,6 +38,7 @@ if __name__=='__main__':
     opts.add_option('','--subset_indivs',dest='subset_indivs', default=None)
     
     opts.add_option('','--do_plot',dest='do_plot',action="store_true",default=False)
+    opts.add_option('','--g_merge_overlap_thresh',dest='merge_overlap_thresh',default=-1, type=float)
 
     opts.add_option('','--simplify_complex_eval',
                     dest='simplify_complex_eval',
@@ -79,6 +80,7 @@ if __name__=='__main__':
         #if contig == "chr2" and not (mx>=242817287 and mn<=243191022): continue
         #if contig == "chr20" and not (mx>=16567242 and mn<=16587150): continue
         #if contig == "chr20" and not (mx>=356222 and mn<=368698): continue
+        #if contig == "chr20" and not (mx>=16077807 and mn<=16085653): continue
         #if contig == "chr6" and not (mx>=151476852 and mn<=151495535): continue
          
         """
@@ -96,21 +98,21 @@ if __name__=='__main__':
             for c in overlapping_call_clusts:
                 start, end = c.get_med_start_end()
                 #print start, end
-                #if contig == "chr20" and not (start==356222 and end==368698): continue
-                gt.output(g, contig, start, end, F_gt, F_call, F_filt, filt, plot=do_plot,v=False)  
+                #if contig == "chr20" and not (start==16077807 and end==16085653): continue
+                gt.output(g, contig, start, end, F_gt, F_call, F_filt, filt, o.merge_overlap_thresh, plot=do_plot,v=False)  
         else:
             s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=do_plot)
             
             if len(s_e_segs)<=1 or non_adj:
                 for s_e in s_e_segs:
                     s,e = s_e
-                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, plot=do_plot)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, o.merge_overlap_thresh, plot=do_plot)  
             else:
                 for i, s_e in enumerate(s_e_segs):
                     s,e = s_e
                     print s, e
                     inc_indivs = include_indivs[i]
-                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=inc_indivs, plot=do_plot)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, o.merge_overlap_thresh, include_indivs=inc_indivs, plot=do_plot)  
 
     F_gt.close()
     F_call.close()

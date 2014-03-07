@@ -1216,8 +1216,6 @@ class genotyper:
         print "h_clustering..."
         t = time.time()
         Z = hclust.linkage(mus, method='centroid', metric='euclidean')
-        #Z = hclust.linkage(mus, method='average', metric='euclidean')
-        #Z = hclust.linkage(mus, method='weighted', metric='euclidean')
         print "done %fs"%(time.time()-t)
         params, bics, gmms, all_labels = [], [], [], []
         
@@ -1230,7 +1228,6 @@ class genotyper:
             if np.all(grps == prev_grps): continue
 
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
-
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 
             params.append(len(init_mus))
@@ -1238,17 +1235,15 @@ class genotyper:
             gmms.append(gmm)
             all_labels.append(labels)
             prev_grps = grps 
-                
-            ##see if by removing overlapping calls we can improve the fit
             
         print "done %fs"%(time.time()-t)
         idx = np.argmin(bics)
         gmm = gmms[idx]
         labels = all_labels[idx]
+        
+
         ####NOW, finally merge calls that are too close 
-        
         n_labels = np.unique(labels).shape[0] 
-        
         if n_labels>1:
             gmm, labels = self.final_call_merge(gmm, labels, mus) 
 

@@ -1052,7 +1052,7 @@ class genotyper:
                 ax.text(x,y,"%.2f %.2f %.2f %.2f %.2f"%(o1, ds1, us[0], ss[0], ws[0] ), fontsize=6, horizontalalignment='center', verticalalignment='center')
                 ax.text(x,y-.15,"%.2f %.2f %.2f %.2f %.2f"%(o2, ds2, us[1], ss[1], ws[1] ), fontsize=6, verticalalignment='center', horizontalalignment='center')
              
-            ax.text(xmin+1,ymax-.2,"%.2f"%(np.mean(all_os)), fontsize=8, verticalalignment='center', horizontalalignment='right')
+            ax.text(xmin+1,ymax-.2,"%.2f %s.2f"%(np.mean(all_os), np.max(all_os)), fontsize=8, verticalalignment='center', horizontalalignment='right')
             
     def aug_dendrogram(self, ax, ddata):
         for i, d in zip(ddata['icoord'], ddata['dcoord']):

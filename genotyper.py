@@ -1308,7 +1308,6 @@ class genotyper:
             gmms.append(gmm)
             all_labels.append(labels)
         
-        m = np.argmin(np.array(bics))
         return params, bics, gmms, all_labels
 
     def initialize(self, X, grps):

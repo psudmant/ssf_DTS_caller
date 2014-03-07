@@ -890,8 +890,11 @@ def assess_GT_overlaps(gmm):
         
 def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plot=False, v=False):
 
+    merge_overlap_thresh = .1
+    #merge_overlap_thresh = -1
+
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
-    gX = g.GMM_genotype(X, include_indivs)
+    gX = g.GMM_genotype(X, include_indivs = include_indivs, merge_overlap_thresh=merge_overlap_thresh)
     u_o, med_o, overlaps = assess_GT_overlaps(gX.gmm)
 
     if gX.fail_filter(filt):
@@ -910,7 +913,7 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plo
     if plot:
         print "plotting %s %d %d"%(contig, s, e)
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
-        gXs = g.GMM_genotype(Xs, include_indivs)
+        gXs = g.GMM_genotype(Xs, include_indivs = include_indivs, merge_overlap_thresh=merge_overlap_thresh )
         g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, overlaps, fn="./plotting/test/%s_%d_%d.png"%(contig, s, e))
 
 
@@ -1016,7 +1019,7 @@ class genotyper:
         print u_labels
 
         for i in xrange(l):
-            if not i in u_labels: continue
+            #if not i in u_labels: continue
             c = cm.hsv(float(i)/l,1)
             mu = gmm.means[i,0]
             var = gmm.covars[i][0][0]
@@ -1095,6 +1098,8 @@ class genotyper:
             self.addGMM(gXs.gmm, axarr[1,0], sunk_cps, gXs.labels)
             axarr[0,1].plot(gX.params, gX.bics, 'ro', ms=5)
             axarr[0,1].plot(gXs.params, gXs.bics, 'go', ms=5)
+            amin = np.argmin(np.array(gX.bics))
+            axarr[0,1].plot(gX.params[amin], gX.bics[amin], 'bo', ms=7)
         
         fig.sca(axarr[1,2]) 
         dendro = hclust.dendrogram(gXs.Z, orientation='right')
@@ -1192,14 +1197,12 @@ class genotyper:
         return gmm, labels, bic 
     
 
-    def GMM_genotype(self, X, merge_overlap_thresh=-1, include_indivs = None, FOUT = None):
+    def GMM_genotype(self, X, merge_overlap_thresh = -1, include_indivs = None, FOUT = None):
         """
         GMM genotyping
         merge_overlap_thresh, if -1, don't ever merge, however, 
         otherwise, if overlap > merge_overlap_thresh, then merge and recalculate 
-
         """
-         
         if include_indivs:
             l = len(include_indivs)
             new_X = np.zeros((l, X.shape[1]))
@@ -1240,8 +1243,8 @@ class genotyper:
             prev_grps = grps 
                 
             ##see if by removing overlapping calls we can improve the fit
+            
             if merge_overlap_thresh!=-1 and np.unique(labels).shape[0]>1:
-                print "ENTERING!!!!"
                 _ =  self.merge_overlapping_gaussians(mus, 
                                                       gmm, 
                                                       labels, 
@@ -1268,15 +1271,19 @@ class genotyper:
         params, bics, gmms, all_labels = [], [], [], []
 
         u_o, med_o, overlaps = assess_GT_overlaps(gmm)
-        max_ostat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
-        
-        while max(max_ostat['os']) > merge_overlap_thresh:
-            u1, u2 = max_ostat['us'] 
+        max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
+        init_mus = None 
+        while max(max_overlap_stat['os']) > merge_overlap_thresh:
+            u1, u2 = max_overlap_stat['us'] 
             l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
+            
+            #COPY THE LABELS! because you overwrite this numpy array!
+            labels = np.array(labels)
             labels[labels==l2] = l1
             init_mus, init_vars, init_weights = self.initialize(mus, labels) 
 
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=0)
+
             params.append(len(init_mus))
             bics.append(ic)
             gmms.append(gmm)
@@ -1286,14 +1293,22 @@ class genotyper:
 
             if np.unique(labels).shape[0]==1: break
 
-            u_o, med_o, overlaps = assess_GT_overlaps(gmm)
-            max_ostat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
+            params.append(len(init_mus))
+            bics.append(ic)
+            gmms.append(gmm)
+            all_labels.append(labels)
 
-        params.append(len(init_mus))
-        bics.append(ic)
-        gmms.append(gmm)
-        all_labels.append(labels)
+            u_o, med_o, overlaps = assess_GT_overlaps(gmm)
+            max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         
+        if init_mus!=None:
+            #make sure the while loop got entered into    
+            params.append(len(init_mus))
+            bics.append(ic)
+            gmms.append(gmm)
+            all_labels.append(labels)
+        
+        m = np.argmin(np.array(bics))
         return params, bics, gmms, all_labels
 
     def initialize(self, X, grps):

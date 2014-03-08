@@ -1281,7 +1281,7 @@ class genotyper:
         print gmm.means
 
         u_o, med_o, overlaps = assess_GT_overlaps(gmm)
-        max_overlap_stat = sorted(overlaps, key = lambda x: np.absolute(x['us'][0]-x['us'][1]))[-1]
+        max_overlap_stat = sorted(overlaps, key = lambda x: np.absolute(x['us'][0]-x['us'][1]))[0]
         d = np.absolute(max_overlap_stat['us'][0]- max_overlap_stat['us'][1])
         while d < min_dist and n_labels>1:
             u1, u2 = max_overlap_stat['us'] 
@@ -1296,7 +1296,7 @@ class genotyper:
             n_labels = np.unique(labels).shape[0] 
 
             if n_labels>1:
-                max_overlap_stat = sorted(overlaps, key = lambda x: np.absolute(x['us'][0]-x['us'][1]))[-1]
+                max_overlap_stat = sorted(overlaps, key = lambda x: np.absolute(x['us'][0]-x['us'][1]))[0]
                 d = np.absolute(max_overlap_stat['us'][0]- max_overlap_stat['us'][1])
         
         return gmm, labels

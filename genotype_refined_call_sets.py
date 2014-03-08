@@ -22,6 +22,11 @@ def get_min_max(cc):
     
     return mn, mx
 
+
+
+
+
+
 if __name__=='__main__':
 
     opts = OptionParser()
@@ -38,6 +43,7 @@ if __name__=='__main__':
     opts.add_option('','--subset_indivs',dest='subset_indivs', default=None)
     
     opts.add_option('','--do_plot',dest='do_plot',action="store_true",default=False)
+    opts.add_option('','--output_VCF',dest='output_VCF',action="store_true",default=False)
     
     opts.add_option('','--simplify_complex_eval',
                     dest='simplify_complex_eval',
@@ -49,7 +55,7 @@ if __name__=='__main__':
                             really well for high-coverage genomes""")
     
     opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=float,default=0.5)
-    opts.add_option('','--filter_max_mu_overlap', dest='max_mu_overlap',type=float,default=0.5)
+    opts.add_option('','--filter_max_overlap', dest='max_overlap',type=float,default=0.5)
     
     (o, args) = opts.parse_args()
     
@@ -74,7 +80,7 @@ if __name__=='__main__':
     g.setup_output(F_gt, F_filt)
     k=-1
 
-    filt = gt.filter_obj(o.min_max_mu_d, o.max_mu_overlap)
+    filt = gt.filter_obj(o.min_max_mu_d, o.max_overlap)
     
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
         mn, mx = get_min_max(overlapping_call_clusts)

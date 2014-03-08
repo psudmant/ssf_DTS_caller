@@ -529,7 +529,7 @@ def get_best_gt(call, contig, g):
     
 
 class filter_obj:
-    def __init__(self, min_max_mu_d, max_mu_overlap):
+    def __init__(self, min_max_mu_d, max_overlap):
         """
         min_max_mu_d - the minumum acceptible distance between gaussians for
         the maximum distance of any fit - ie, make sure that there is at least 
@@ -539,7 +539,7 @@ class filter_obj:
         adjacent fit gaussians to be accepted
         """
         self.min_max_mu_d = min_max_mu_d
-        self.max_mu_overlap = max_mu_overlap
+        self.max_overlap = max_overlap
         
 class GMM_gt(object):
 
@@ -655,10 +655,12 @@ class GMM_gt(object):
 
     def fail_filter(self, filt):
         
-        if self.f_correct == None: 
-            self.f_correct = self.correct_order_proportion()
+        u_o, med_o, overlaps = assess_GT_overlaps(self.gmm)
+        max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         
-        #mean_mu_delta = self.get_mean_inter_mu_dist()
+        if max(max_overlap_stat['os'])>=filt.max_overlap:
+            return True
+
         mu_mu_d, min_mu_d, max_mu_d = self.get_mean_min_max_inter_mu_dist()
         
         if (max_mu_d < filt.min_max_mu_d):
@@ -666,6 +668,10 @@ class GMM_gt(object):
 
         return False
         
+        #mean_mu_delta = self.get_mean_inter_mu_dist()
+        
+        #if self.f_correct == None: 
+        #    self.f_correct = self.correct_order_proportion()
         #if (self.f_correct <= frac_dir_min):
         #    return True
 

@@ -655,6 +655,9 @@ class GMM_gt(object):
 
     def fail_filter(self, filt):
         
+        if self.n_clusts ==1 or self.gmm.means.shape[0] == 1:  
+            return True
+
         u_o, med_o, overlaps = assess_GT_overlaps(self.gmm)
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         
@@ -1230,6 +1233,7 @@ class genotyper:
 
         prev_grps = np.array([])
         for k in np.arange(.2, 1.5,  0.001):
+            print k
             grps = hclust.fcluster(Z, k, criterion='distance')
             if np.all(grps == prev_grps): continue
 

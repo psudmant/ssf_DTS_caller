@@ -1243,7 +1243,7 @@ class genotyper:
             
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
             
-            if len(init_mus)>25: continue
+            if len(init_mus)>30: continue
             
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 

@@ -15,6 +15,9 @@ from sklearn import cluster
 from sklearn import metrics
 from sklearn import mixture
 
+
+from fastahack import FastaHack
+
 from sets import Set
 
 import math
@@ -899,7 +902,7 @@ def assess_GT_overlaps(gmm):
     return u_o, med_o, overlaps
     
         
-def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plot=False, v=False):
+def output(g, contig, s, e, F_gt, F_call, F_filt, F_VCF, filt, include_indivs=None, plot=False, v=False):
 
     print "%s %d %d"%(contig, s, e)
     stdout.flush()
@@ -917,7 +920,8 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plo
         return
 
     F_call.write("%s\t%d\t%d\n"%(contig, s, e))
-    g.output(F_gt, gX, contig, s, e, v=v)
+    g.output(F_gt, F_VCF, gX, contig, s, e, v=v)
+
     gX.output_filter_data(F_filt, contig, s, e)
     
      
@@ -930,10 +934,13 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plo
 
 class genotyper:
     
-    def setup_output(self, FOUT, FFILT):
+    def setup_output(self, FOUT, FFILT, F_VCF):
         outstr = "contig\tstart\tend\t%s\n"%("\t".join(self.indivs))
         FOUT.write(outstr)
-
+        
+        VCF_outstr = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT%s\n"%("\t".join(self.indivs))
+        F_VCF.write(outstr)
+        
         FFILT.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format("chr", 
                                                                  "start", 
                                                                  "end", 
@@ -944,27 +951,55 @@ class genotyper:
                                                                  "wnd_size", 
                                                                  "bic_delta"))
 
-    def output(self, FOUT, gX, contig, s, e, v=False):
+    def output(self, FOUT, F_VCF, gX, contig, s, e, v=False):
         
         outstr = "%s\t%d\t%d"%(contig, s, e)
         gts_by_indiv = gX.get_gts_by_indiv()
+        gt_lls_by_indiv = gX.get_gts_lls_by_indiv()
         
+        """
+        VCF OUTPUT
+        GT:CN:CNP:GP:PL
+            
+        CN = copy number
+        CNP = Copy Number likelihood
+
+        GT.. genotype
+        GP.. genotype likelihood
+        
+        #PL.. phred scaled genotype likelihood...? MAYBE?
+        """
+        V_outstr = "{CHROM}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{FILTER}\t{FORMAT}"
+        ALTS = "<0>,<2>"
+        VCF_contig = contig.replace("chr","") 
+        V_outstr = V_outstr.format(CHROM=VCF_contig,
+                                   POS=s+1,
+                                   ID="%s_%d_%d"%(contig, s+1, e),
+                                   REF=self.fasta['%s:%d'%(VCF_contig,s)],
+                                   ALT=ALTS,
+                                   QUAL='.',
+                                   FILTER="PASS",
+                                   FORMAT="GT:CN:GP:CNP")
+        
+        V_data = []
         ordered_gts = []
         for indiv in self.indivs:
             if indiv in gts_by_indiv:
                 ordered_gts.append(gts_by_indiv[indiv])
+                V_data.append("0/0:%d:0:0"%(gts_by_indiv[indiv]))
             else:
                 ordered_gts.append(-1)
-        outstr = "%s\t%s\n"%(outstr, "\t".join("%d"%gt for gt in ordered_gts))
-        if v:
-            """
-            for indiv in self.indivs:
-                if indiv in gts_by_indiv:
-                   print indiv, gts_by_indiv[indiv]
-            """
-            print outstr
+                V_data.append("./.:0:0:0")
 
+        outstr = "%s\t%s\n"%(outstr, "\t".join("%d"%gt for gt in ordered_gts))
+        V_outstr  = "%s\t%s\n"%(V_outstr, "\t".join(V_data))
+        
         FOUT.write(outstr)
+        F_VCF.write(V_outstr)
+        
+        if v:
+            print V_outstr
+
     
     def init_on_indiv_DTS_files(self, **kwargs):
 
@@ -1000,6 +1035,7 @@ class genotyper:
         self.plot_dir  = kwargs.get("plot_dir", None)
         
         subset_indivs  = kwargs.get("subset_indivs", None)
+        fn_fasta  = kwargs.get("fn_fa", None)
         
 
         self.contig = contig
@@ -1021,6 +1057,8 @@ class genotyper:
         print >>stderr, "loading %d genomes..."%(k)
         t = time.time()
         print >>stderr, "done (%fs)"%(time.time()-t)
+        
+        self.fasta = FastaHack(fn_fasta)
        
     def addGMM(self, gmm, ax, X, labels, overlaps=None):
         

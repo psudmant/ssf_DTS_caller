@@ -1,6 +1,8 @@
 from optparse import OptionParser
 from collections import defaultdict
 
+from fastahack import FastaHack
+
 import numpy as np
 from sys import stderr
 import pandas as pd
@@ -34,6 +36,7 @@ if __name__=='__main__':
     opts.add_option('','--gglob_dir',dest='gglob_dir')
     opts.add_option('','--dup_tabix',dest='fn_dup_tabix')
     opts.add_option('','--genotype_output',dest='fn_gt_out')
+    opts.add_option('','--vcf_output',dest='fn_vcf_out')
     opts.add_option('','--call_output',dest='fn_call_out')
     opts.add_option('','--contig',dest='contig')
     opts.add_option('','--visualizations_dir',dest='out_viz_dir')
@@ -42,8 +45,9 @@ if __name__=='__main__':
     opts.add_option('','--subset',dest='subset',type=int,default=0)
     opts.add_option('','--subset_indivs',dest='subset_indivs', default=None)
     
+    opts.add_option('','--genome_fa',dest='fn_fa', default="/net/eichler/vol7/home/psudmant/genomes/fastas/hg19_1kg_phase2_reference/human_g1k_v37.fasta")
+    
     opts.add_option('','--do_plot',dest='do_plot',action="store_true",default=False)
-    opts.add_option('','--output_VCF',dest='output_VCF',action="store_true",default=False)
     
     opts.add_option('','--simplify_complex_eval',
                     dest='simplify_complex_eval',
@@ -66,8 +70,9 @@ if __name__=='__main__':
     contig = o.contig
     tbx_dups = pysam.Tabixfile(o.fn_dup_tabix)
     callset_clust = cluster.cluster_callsets(o.fn_call_table, contig)
-    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs)
+    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs, fn_fa=o.fn_fa)
     F_gt = open(o.fn_gt_out,'w')
+    F_VCF = open(o.fn_vcf_out,'w')
     F_call = open(o.fn_call_out,'w')
     F_filt = open("%s.filter_inf"%o.fn_call_out,'w')
     
@@ -76,12 +81,14 @@ if __name__=='__main__':
     each element in the list is a recip overlap cluster
     """
     do_plot = o.do_plot
-     
-    g.setup_output(F_gt, F_filt)
+    verbose=False
+    verbose=True
+
+    g.setup_output(F_gt, F_filt, F_VCF)
     k=-1
 
     filt = gt.filter_obj(o.min_max_mu_d, o.max_overlap)
-    
+     
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
         mn, mx = get_min_max(overlapping_call_clusts)
            
@@ -89,7 +96,7 @@ if __name__=='__main__':
         #if contig == "chr20" and not (mx>=16567242 and mn<=16587150): continue
         #if contig == "chr20" and not (mx>=356222 and mn<=368698): continue
         #if contig == "chr20" and not (mx>=16077807 and mn<=16085653): continue
-        #if contig == "chr20" and not (mx>=24478257 and mn<=24604762): continue
+        #if contig == "chr20" and not (mx>=25810622 and mn<=25827394): continue
         #if contig == "chr6" and not (mx>=151476852 and mn<=151495535): continue
          
         """
@@ -107,21 +114,21 @@ if __name__=='__main__':
             for c in overlapping_call_clusts:
                 start, end = c.get_med_start_end()
                 #print start, end
-                #if contig == "chr20" and not (start==24478257 and end==24604762): continue
-                gt.output(g, contig, start, end, F_gt, F_call, F_filt, filt, plot=do_plot,v=False)  
+                #if contig == "chr20" and not (start==26169672 and end==26192481): continue
+                gt.output(g, contig, start, end, F_gt, F_call, F_filt, F_VCF, filt, plot=do_plot,v=verbose)  
         else:
             s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=do_plot)
             
             if len(s_e_segs)<=1 or non_adj:
                 for s_e in s_e_segs:
                     s,e = s_e
-                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, plot=do_plot)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, F_VCF, filt, plot=do_plot, v=verbose)  
             else:
                 for i, s_e in enumerate(s_e_segs):
                     s,e = s_e
                     print s, e
                     inc_indivs = include_indivs[i]
-                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=inc_indivs, plot=do_plot)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt,F_VCF, filt, include_indivs=inc_indivs, plot=do_plot, v=verbose)  
 
     F_gt.close()
     F_call.close()

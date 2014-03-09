@@ -1,5 +1,6 @@
 import glob
 from sys import stderr
+from sys import stdout
 import numpy as np
 
 import time
@@ -659,6 +660,7 @@ class GMM_gt(object):
             return True
 
         u_o, med_o, overlaps = assess_GT_overlaps(self.gmm)
+        
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         
         if max(max_overlap_stat['os'])>=filt.max_overlap:
@@ -899,6 +901,9 @@ def assess_GT_overlaps(gmm):
         
 def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plot=False, v=False):
 
+    print "%s %d %d"%(contig, s, e)
+    stdout.flush()
+    
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs = include_indivs)
     u_o, med_o, overlaps = assess_GT_overlaps(gX.gmm)
@@ -915,7 +920,7 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=None, plo
     g.output(F_gt, gX, contig, s, e, v=v)
     gX.output_filter_data(F_filt, contig, s, e)
     
-    
+     
     if plot:
         print "plotting %s %d %d"%(contig, s, e)
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
@@ -1233,11 +1238,13 @@ class genotyper:
 
         prev_grps = np.array([])
         for k in np.arange(.2, 1.5,  0.001):
-            print k
             grps = hclust.fcluster(Z, k, criterion='distance')
             if np.all(grps == prev_grps): continue
-
+            
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
+            
+            if len(init_mus)>25: continue
+            
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 
             params.append(len(init_mus))

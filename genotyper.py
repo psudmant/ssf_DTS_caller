@@ -784,7 +784,7 @@ class GMM_gt(object):
         gt_lls_by_indiv = {}
 
         for i, indiv in enumerate(self.indivs):  
-            lls = {gt:max(np.log(self.posterior_probs[i,label]),-1000) for label, gt in labels_to_gt.iteritems() }
+            lls = {gt:max(np.log(self.posterior_probs[i,label])/np.log(10),-1000) for label, gt in labels_to_gt.iteritems() }
             gt_lls_by_indiv[indiv] = lls 
 
         return gt_lls_by_indiv
@@ -959,7 +959,7 @@ class genotyper:
         outstr = "contig\tstart\tend\t%s\n"%("\t".join(self.indivs))
         FOUT.write(outstr)
         
-        VCF_outstr = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT%s\n"%("\t".join(self.indivs))
+        VCF_outstr = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s\n"%("\t".join(self.indivs))
         F_VCF.write(VCF_outstr)
         
         FFILT.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format("chr", 
@@ -982,6 +982,45 @@ class genotyper:
         
         gt_lls_by_indiv = gX.get_gt_lls_by_indiv(labels_to_gt)
         
+        
+        #reference hap_cn is already 1
+        hap_cns = [1]
+        if 0 in cns or 1 in cns:
+            hap_cns = [1,0]
+        
+        if max(cns)>2:
+            max_hap = int(math.ceil(max(cns)/2.0))
+            hap_cns += range(2,max_hap+1) 
+        
+        hap_cns_to_labels = {1:0}
+        
+        i=1
+        for hcn in hap_cns:
+            if hcn==1: continue
+            hap_cns_to_labels[hcn]=i
+            i+=1
+
+        #cns = 0,1,2 
+        #F(j/k) = (k*(k+1)/2)+j 
+        GTs_to_cps = {} 
+        cps_to_GTs = {} 
+        jk_tups = []
+        jk_tups_to_cp = {} 
+        for i in xrange(len(hap_cns)):
+            for j in xrange(i,len(hap_cns)):
+                c1, c2 = hap_cns[i], hap_cns[j]
+                cp = c1+c2
+                lbl = "%d/%d"%(hap_cns_to_labels[c1], hap_cns_to_labels[c2])
+                GTs_to_cps[lbl] = cp 
+                jk_tup = tuple([hap_cns_to_labels[c1], hap_cns_to_labels[c2]])
+                jk_tups.append(jk_tup)
+                jk_tups_to_cp[jk_tup] = cp
+
+                if not cp in cps_to_GTs: 
+                    cps_to_GTs[cp] = []
+
+                cps_to_GTs[cp].append(lbl)
+        
         """
         VCF OUTPUT
         GT:CN:CNP:GP:PL
@@ -995,7 +1034,8 @@ class genotyper:
         #PL.. phred scaled genotype likelihood...? MAYBE?
         """
         V_outstr = "{CHROM}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{FILTER}\t{INFO}\t{FORMAT}\t"
-        ALTS = "<0>,<2>"
+        ALTS = ",".join(["CN%d"%c for c in hap_cns if c!=1])
+
         VCF_contig = contig.replace("chr","")
         INFO="END=%d;SVTYPE=CNV"%e
         V_outstr = V_outstr.format(CHROM=VCF_contig,
@@ -1009,22 +1049,39 @@ class genotyper:
                                    FORMAT="GT:CN:GP:CNP")
         
         V_data = []
-        ordered_gts = []
+        ordered_cps = []
         for indiv in self.indivs:
             if indiv in gts_by_indiv:
-                ordered_gts.append(gts_by_indiv[indiv])
+                ordered_cps.append(gts_by_indiv[indiv])
                 
                 s_CNP=",".join(["%.2f"%(cn not in cns and -1000 or gt_lls_by_indiv[indiv][cn]) for cn in cn_range])
-
-                s="0/0:{COPY}:0:{CNP}".format(COPY=gts_by_indiv[indiv],
-                                              CNP=s_CNP)
+                s_GPs = ""
+                COPY=gts_by_indiv[indiv]
+                GT = cps_to_GTs[COPY][0]
+                
+                GPs = np.zeros(len(jk_tups))
+                #F(j/k) = (k*(k+1)/2)+j 
+                for jk in jk_tups:
+                    j,k = jk
+                    p = (k*(k+1))/2+j
+                    cp = jk_tups_to_cp[jk]
+                    if not cp in cns:
+                        GPs[p] = -1000
+                    else:
+                        GPs[p] = gt_lls_by_indiv[indiv][cp] - (np.log(len(cps_to_GTs[cp]))  / np.log(10))
+            
+                sGPs = ",".join(["%.2f"%l for l in GPs])
+                s="{GT}:{COPY}:{GPs}:{CNP}".format(COPY=COPY,
+                                             GT=GT,
+                                             CNP=s_CNP,
+                                             GPs = sGPs)
                                               
                 V_data.append(s)
             else:
-                ordered_gts.append(-1)
+                ordered_cps.append(-1)
                 V_data.append("./.:0:0:0")
 
-        outstr = "%s\t%s\n"%(outstr, "\t".join("%d"%gt for gt in ordered_gts))
+        outstr = "%s\t%s\n"%(outstr, "\t".join("%d"%gt for gt in ordered_cps))
         V_outstr  = "%s\t%s\n"%(V_outstr, "\t".join(V_data))
         
         FOUT.write(outstr)

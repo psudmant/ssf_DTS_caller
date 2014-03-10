@@ -567,7 +567,8 @@ class GMM_gt(object):
 
         self.f_correct = None 
         
-        self.l_probs, self.posterior_probs = gmm.eval(X)
+        self.shaped_mus = np.reshape(self.mus, (self.mus.shape[0],1))
+        self.l_probs, self.posterior_probs = gmm.eval(self.shaped_mus)
         
         #only in sklearn 0.14.1
         #self.score_samples = gmm.score_samples(X)
@@ -772,8 +773,11 @@ class GMM_gt(object):
         
         gts_by_indiv = {}
         for i, indiv in enumerate(self.indivs):  
-            gts_by_indiv[indiv] = labels_to_gt[self.labels[i]] 
+            gts_by_indiv[indiv] = int(labels_to_gt[self.labels[i]]) 
         
+        new_labels_to_gt = {k:int(v) for k,v in labels_to_gt.iteritems()}
+        labels_to_gt = new_labels_to_gt
+
         gt_to_labels = {v:k for k,v in labels_to_gt.iteritems()} 
 
         return gts_by_indiv, gt_to_labels, labels_to_gt
@@ -1021,6 +1025,11 @@ class genotyper:
 
                 cps_to_GTs[cp].append(lbl)
         
+        if v:
+            print "cps_to_GTs", cps_to_GTs
+            print "jk_tups_to_cp", jk_tups_to_cp
+            print "GTs_to_cps:", GTs_to_cps
+
         """
         VCF OUTPUT
         GT:CN:CNP:GP:PL
@@ -1069,12 +1078,15 @@ class genotyper:
                         GPs[p] = -1000
                     else:
                         GPs[p] = gt_lls_by_indiv[indiv][cp] - (np.log(len(cps_to_GTs[cp]))  / np.log(10))
-            
+                    if COPY==3:
+                        print gt_lls_by_indiv[indiv], jk, p, cp, GPs
+                        IPython.embed()
+                        
                 sGPs = ",".join(["%.2f"%l for l in GPs])
                 s="{GT}:{COPY}:{GPs}:{CNP}".format(COPY=COPY,
-                                             GT=GT,
-                                             CNP=s_CNP,
-                                             GPs = sGPs)
+                                                   GT=GT,
+                                                   CNP=s_CNP,
+                                                   GPs = sGPs)
                                               
                 V_data.append(s)
             else:
@@ -1093,7 +1105,7 @@ class genotyper:
             print gX.posterior_probs
             print gX.labels
             print np.unique(gX.labels)
-            print gts_to_label, labels_to_gt
+            print "gts_to_label:", gts_to_label, "labels_to_gt:", labels_to_gt
              
     def init_on_indiv_DTS_files(self, **kwargs):
 
@@ -1375,7 +1387,7 @@ class genotyper:
             
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
             
-            if len(init_mus)>30: continue
+            if len(init_mus)>30 and len(bics)>0: continue
             
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 

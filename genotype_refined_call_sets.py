@@ -25,10 +25,6 @@ def get_min_max(cc):
     return mn, mx
 
 
-
-
-
-
 if __name__=='__main__':
 
     opts = OptionParser()
@@ -81,8 +77,9 @@ if __name__=='__main__':
     each element in the list is a recip overlap cluster
     """
     do_plot = o.do_plot
+    #do_plot = True
+    #verbose=True
     verbose=False
-    verbose=True
 
     g.setup_output(F_gt, F_filt, F_VCF)
     k=-1
@@ -96,7 +93,7 @@ if __name__=='__main__':
         #if contig == "chr20" and not (mx>=16567242 and mn<=16587150): continue
         #if contig == "chr20" and not (mx>=356222 and mn<=368698): continue
         #if contig == "chr20" and not (mx>=16077807 and mn<=16085653): continue
-        #if contig == "chr20" and not (mx>=25810622 and mn<=25827394): continue
+        #if contig == "chr20" and not (mx>=6648036 and mn<=6656183): continue
         #if contig == "chr6" and not (mx>=151476852 and mn<=151495535): continue
          
         """
@@ -114,7 +111,7 @@ if __name__=='__main__':
             for c in overlapping_call_clusts:
                 start, end = c.get_med_start_end()
                 #print start, end
-                #if contig == "chr20" and not (start==26169672 and end==26192481): continue
+                #if contig == "chr20" and not (start==6648036 and end==6656183): continue
                 gt.output(g, contig, start, end, F_gt, F_call, F_filt, F_VCF, filt, plot=do_plot,v=verbose)  
         else:
             s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=do_plot)

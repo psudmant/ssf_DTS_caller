@@ -274,7 +274,8 @@ def clust_seg_groups_by_gt(clust, indivs, g, indivs_by_cnv_segs, contig):
         s,e = seg
         X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
         gX = g.GMM_genotype(X)
-        g_by_indiv = gX.get_gts_by_indiv()
+        #g_by_indiv = gX.get_gts_by_indiv()
+        g_by_indiv, gts_to_label, label_to_gt = gX.get_gts_by_indiv()
 
         gts = [g_by_indiv[indiv] for indiv in indivs]
         all_gts.append(np.array(gts))
@@ -566,6 +567,12 @@ class GMM_gt(object):
 
         self.f_correct = None 
         
+        self.l_probs, self.posterior_probs = gmm.eval(X)
+        
+        #only in sklearn 0.14.1
+        #self.score_samples = gmm.score_samples(X)
+
+
         #unique labels are the unique labels and uniq mus are the 
         #mean of the self.mus for each label
         
@@ -767,8 +774,22 @@ class GMM_gt(object):
         for i, indiv in enumerate(self.indivs):  
             gts_by_indiv[indiv] = labels_to_gt[self.labels[i]] 
         
-        return gts_by_indiv
+        gt_to_labels = {v:k for k,v in labels_to_gt.iteritems()} 
+
+        return gts_by_indiv, gt_to_labels, labels_to_gt
             
+    def get_gt_lls_by_indiv(self, labels_to_gt):
+        
+
+        gt_lls_by_indiv = {}
+
+        for i, indiv in enumerate(self.indivs):  
+            lls = {gt:max(np.log(self.posterior_probs[i,label]),-1000) for label, gt in labels_to_gt.iteritems() }
+            gt_lls_by_indiv[indiv] = lls 
+
+        return gt_lls_by_indiv
+
+
     def get_bic_delta(self):
         
         if self.n_clusts+1 in self.params:
@@ -939,7 +960,7 @@ class genotyper:
         FOUT.write(outstr)
         
         VCF_outstr = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT%s\n"%("\t".join(self.indivs))
-        F_VCF.write(outstr)
+        F_VCF.write(VCF_outstr)
         
         FFILT.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format("chr", 
                                                                  "start", 
@@ -954,8 +975,12 @@ class genotyper:
     def output(self, FOUT, F_VCF, gX, contig, s, e, v=False):
         
         outstr = "%s\t%d\t%d"%(contig, s, e)
-        gts_by_indiv = gX.get_gts_by_indiv()
-        gt_lls_by_indiv = gX.get_gts_lls_by_indiv()
+        gts_by_indiv, gts_to_label, labels_to_gt = gX.get_gts_by_indiv()
+        
+        cns = sorted(gts_to_label.keys())
+        cn_range=range(0,max(cns)+1)
+        
+        gt_lls_by_indiv = gX.get_gt_lls_by_indiv(labels_to_gt)
         
         """
         VCF OUTPUT
@@ -969,15 +994,17 @@ class genotyper:
         
         #PL.. phred scaled genotype likelihood...? MAYBE?
         """
-        V_outstr = "{CHROM}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{FILTER}\t{FORMAT}"
+        V_outstr = "{CHROM}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{FILTER}\t{INFO}\t{FORMAT}\t"
         ALTS = "<0>,<2>"
-        VCF_contig = contig.replace("chr","") 
+        VCF_contig = contig.replace("chr","")
+        INFO="END=%d;SVTYPE=CNV"%e
         V_outstr = V_outstr.format(CHROM=VCF_contig,
                                    POS=s+1,
                                    ID="%s_%d_%d"%(contig, s+1, e),
                                    REF=self.fasta['%s:%d'%(VCF_contig,s)],
                                    ALT=ALTS,
                                    QUAL='.',
+                                   INFO=INFO,
                                    FILTER="PASS",
                                    FORMAT="GT:CN:GP:CNP")
         
@@ -986,7 +1013,13 @@ class genotyper:
         for indiv in self.indivs:
             if indiv in gts_by_indiv:
                 ordered_gts.append(gts_by_indiv[indiv])
-                V_data.append("0/0:%d:0:0"%(gts_by_indiv[indiv]))
+                
+                s_CNP=",".join(["%.2f"%(cn not in cns and -1000 or gt_lls_by_indiv[indiv][cn]) for cn in cn_range])
+
+                s="0/0:{COPY}:0:{CNP}".format(COPY=gts_by_indiv[indiv],
+                                              CNP=s_CNP)
+                                              
+                V_data.append(s)
             else:
                 ordered_gts.append(-1)
                 V_data.append("./.:0:0:0")
@@ -999,8 +1032,12 @@ class genotyper:
         
         if v:
             print V_outstr
-
-    
+            print gX.l_probs
+            print gX.posterior_probs
+            print gX.labels
+            print np.unique(gX.labels)
+            print gts_to_label, labels_to_gt
+             
     def init_on_indiv_DTS_files(self, **kwargs):
 
         g = gglob.init_from_DTS(**kwags)

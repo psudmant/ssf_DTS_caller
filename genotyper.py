@@ -1046,7 +1046,7 @@ class genotyper:
         ALTS = ",".join(["CN%d"%c for c in hap_cns if c!=1])
 
         VCF_contig = contig.replace("chr","")
-        INFO="END=%d;SVTYPE=CNV"%e
+        INFO="END=%d;SVTYPE=CNV;LPROBS=%.2f"%(e,np.sum(gX.l_probs))
         V_outstr = V_outstr.format(CHROM=VCF_contig,
                                    POS=s+1,
                                    ID="%s_%d_%d"%(contig, s+1, e),

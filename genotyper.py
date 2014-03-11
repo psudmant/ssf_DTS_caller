@@ -1043,7 +1043,7 @@ class genotyper:
         #PL.. phred scaled genotype likelihood...? MAYBE?
         """
         V_outstr = "{CHROM}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{FILTER}\t{INFO}\t{FORMAT}\t"
-        ALTS = ",".join(["CN%d"%c for c in hap_cns if c!=1])
+        ALTS = ",".join(["<CN%d>"%c for c in hap_cns if c!=1])
 
         VCF_contig = contig.replace("chr","")
         INFO="END=%d;SVTYPE=CNV;LPROBS=%.2f"%(e,np.sum(gX.l_probs))

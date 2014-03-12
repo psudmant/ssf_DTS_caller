@@ -1104,6 +1104,7 @@ class cluster_callsets(object):
             call_groups_to_assess.append(overlap_call_groups[i])
             i+=total_subsets
         
+        print >>stderr, "%d calls in subset"%(len(call_groups_to_assess))
         return call_groups_to_assess
 
 

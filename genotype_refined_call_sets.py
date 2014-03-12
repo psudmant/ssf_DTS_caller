@@ -1,6 +1,8 @@
 from optparse import OptionParser
 from collections import defaultdict
 
+from fastahack import FastaHack
+
 import numpy as np
 from sys import stderr
 import pandas as pd
@@ -10,7 +12,7 @@ import time
 import cluster
 from get_windowed_variance import get_windowed_variance
 import genotyper as gt
-
+import IPython
 
 def get_min_max(cc):
     mn = 9e9
@@ -22,18 +24,15 @@ def get_min_max(cc):
     
     return mn, mx
 
+
 if __name__=='__main__':
 
     opts = OptionParser()
 
     opts.add_option('','--gglob_dir',dest='gglob_dir')
     opts.add_option('','--dup_tabix',dest='fn_dup_tabix')
-    #opts.add_option('','--in_DTS_dir',dest='in_DTS_dir')
-    #opts.add_option('','--in_sunk_DTS_dir',dest='in_sunk_DTS_dir')
-    #opts.add_option('','--contigs',dest='fn_contigs')
-    #opts.add_option('','--sunk_contigs',dest='fn_sunk_contigs')
-    #opts.add_option('','--GC_contents_dir',dest='GC_contents_dir')
     opts.add_option('','--genotype_output',dest='fn_gt_out')
+    opts.add_option('','--vcf_output',dest='fn_vcf_out')
     opts.add_option('','--call_output',dest='fn_call_out')
     opts.add_option('','--contig',dest='contig')
     opts.add_option('','--visualizations_dir',dest='out_viz_dir')
@@ -42,7 +41,21 @@ if __name__=='__main__':
     opts.add_option('','--subset',dest='subset',type=int,default=0)
     opts.add_option('','--subset_indivs',dest='subset_indivs', default=None)
     
+    opts.add_option('','--genome_fa',dest='fn_fa', default="/net/eichler/vol7/home/psudmant/genomes/fastas/hg19_1kg_phase2_reference/human_g1k_v37.fasta")
+    
     opts.add_option('','--do_plot',dest='do_plot',action="store_true",default=False)
+    
+    opts.add_option('','--simplify_complex_eval',
+                    dest='simplify_complex_eval',
+                    action="store_true",
+                    default=False,
+                    help="""complex loci are those where multiple calls overlap
+                            The procedure to determine overlappping set of calls and assign
+                            each uniquely to a set of individuals is long and works only 
+                            really well for high-coverage genomes""")
+    
+    opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=float,default=0.5)
+    opts.add_option('','--filter_max_overlap', dest='max_overlap',type=float,default=0.5)
     
     (o, args) = opts.parse_args()
     
@@ -53,8 +66,10 @@ if __name__=='__main__':
     contig = o.contig
     tbx_dups = pysam.Tabixfile(o.fn_dup_tabix)
     callset_clust = cluster.cluster_callsets(o.fn_call_table, contig)
-    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs)
+    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs, fn_fa=o.fn_fa)
+
     F_gt = open(o.fn_gt_out,'w')
+    F_VCF = open(o.fn_vcf_out,'w')
     F_call = open(o.fn_call_out,'w')
     F_filt = open("%s.filter_inf"%o.fn_call_out,'w')
     
@@ -63,17 +78,23 @@ if __name__=='__main__':
     each element in the list is a recip overlap cluster
     """
     do_plot = o.do_plot
-     
-    g.setup_output(F_gt, F_filt)
+    #do_plot = True
+    #verbose=True
+    verbose=False
+
+    g.setup_output(F_gt, F_filt, F_VCF)
     k=-1
 
-    filt = gt.filter_obj(0.5,0.5)
-    
+    filt = gt.filter_obj(o.min_max_mu_d, o.max_overlap)
+     
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
         mn, mx = get_min_max(overlapping_call_clusts)
            
         #if contig == "chr2" and not (mx>=242817287 and mn<=243191022): continue
-        #if contig == "chr20" and not (mx>=1548059 and mn<=1601096): continue
+        #if contig == "chr20" and not (mx>=16567242 and mn<=16587150): continue
+        #if contig == "chr20" and not (mx>=356222 and mn<=368698): continue
+        #if contig == "chr20" and not (mx>=16077807 and mn<=16085653): continue
+        #if contig == "chr20" and not (mx>=6648036 and mn<=6656183): continue
         #if contig == "chr6" and not (mx>=151476852 and mn<=151495535): continue
          
         """
@@ -83,25 +104,28 @@ if __name__=='__main__':
         """
         k+=1
 
-        if k%100==0: print "%d genotypes evaluated..."%k
+        if k%1==0: 
+            print "".join("*" for q in xrange(50))
+            print "%d genotypes evaluated..."%k
         
-        if len(overlapping_call_clusts) == 1:
-            c = overlapping_call_clusts[0]
-            start, end = c.get_med_start_end()
-            gt.output(g, contig, start, end, F_gt, F_call, F_filt, filt, plot=do_plot)  
+        if len(overlapping_call_clusts) == 1 or o.simplify_complex_eval:
+            for c in overlapping_call_clusts:
+                start, end = c.get_med_start_end()
+                #print start, end
+                #if contig == "chr20" and not (start==6648036 and end==6656183): continue
+                gt.output(g, contig, start, end, F_gt, F_call, F_filt, F_VCF, filt, plot=do_plot,v=verbose)  
         else:
             s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=do_plot)
             
             if len(s_e_segs)<=1 or non_adj:
                 for s_e in s_e_segs:
                     s,e = s_e
-                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, plot=do_plot)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, F_VCF, filt, plot=do_plot, v=verbose)  
             else:
                 for i, s_e in enumerate(s_e_segs):
                     s,e = s_e
-                    print s, e
                     inc_indivs = include_indivs[i]
-                    gt.output(g, contig, s, e, F_gt, F_call, F_filt, filt, include_indivs=inc_indivs, plot=do_plot)  
+                    gt.output(g, contig, s, e, F_gt, F_call, F_filt,F_VCF, filt, include_indivs=inc_indivs, plot=do_plot, v=verbose)  
 
     F_gt.close()
     F_call.close()

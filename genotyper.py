@@ -1037,10 +1037,9 @@ class genotyper:
         CN = copy number
         CNP = Copy Number likelihood
 
-        
         #PL.. phred scaled genotype likelihood...? MAYBE?
         """
-        V_outstr = "{CHROM}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{FILTER}\t{INFO}\t{FORMAT}\t"
+        V_outstr = "{CHROM}\t{POS}\t{ID}\t{REF}\t{ALT}\t{QUAL}\t{FILTER}\t{INFO}\t{FORMAT}"
         ALTS = ",".join(["<CN%d>"%c for c in hap_cns if c!=1])
 
         VCF_contig = contig.replace("chr","")
@@ -1095,7 +1094,6 @@ class genotyper:
                                                          GLs = sGLs,
                                                          PLs=sPLs,
                                                          CNL=s_CNL)
-                                              
                 V_data.append(s)
             else:
                 ordered_cps.append(-1)

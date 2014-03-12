@@ -1037,8 +1037,6 @@ class genotyper:
         CN = copy number
         CNP = Copy Number likelihood
 
-        GT.. genotype
-        GP.. genotype likelihood
         
         #PL.. phred scaled genotype likelihood...? MAYBE?
         """
@@ -1046,7 +1044,15 @@ class genotyper:
         ALTS = ",".join(["<CN%d>"%c for c in hap_cns if c!=1])
 
         VCF_contig = contig.replace("chr","")
-        INFO="END=%d;SVTYPE=CNV;LPROBS=%.2f"%(e,np.sum(gX.l_probs))
+
+        if ALTS=="<CN2>":
+            SVTYPE="DUP"
+        elif ALTS=="<CN0>":
+            SVTYPE="DEL"
+        else:
+            SVTYPE="CNV"
+
+        INFO="END=%d;SVTYPE=%s;LPROBS=%.2f"%(e, SVTYPE ,np.sum(gX.l_probs))
         V_outstr = V_outstr.format(CHROM=VCF_contig,
                                    POS=s+1,
                                    ID="%s_%d_%d"%(contig, s+1, e),
@@ -1055,7 +1061,7 @@ class genotyper:
                                    QUAL='.',
                                    INFO=INFO,
                                    FILTER="PASS",
-                                   FORMAT="GT:CN:GP:CNP")
+                                   FORMAT="GT:CN:GL:PL:CNL")
         
         V_data = []
         ordered_cps = []
@@ -1063,30 +1069,32 @@ class genotyper:
             if indiv in gts_by_indiv:
                 ordered_cps.append(gts_by_indiv[indiv])
                 
-                s_CNP=",".join(["%.2f"%(cn not in cns and -1000 or gt_lls_by_indiv[indiv][cn]) for cn in cn_range])
-                s_GPs = ""
+                s_CNL=",".join(["%.2f"%(cn not in cns and -1000 or gt_lls_by_indiv[indiv][cn]) for cn in cn_range])
+                s_GLs = ""
                 COPY=gts_by_indiv[indiv]
                 GT = cps_to_GTs[COPY][0]
                 
-                GPs = np.zeros(len(jk_tups))
+                GLs = np.zeros(len(jk_tups))
+                PLs = np.zeros(len(jk_tups))
                 #F(j/k) = (k*(k+1)/2)+j 
                 for jk in jk_tups:
                     j,k = jk
                     p = (k*(k+1))/2+j
                     cp = jk_tups_to_cp[jk]
                     if not cp in cns:
-                        GPs[p] = -1000
+                        GLs[p] = -1000
+                        PLs[p] = 1000
                     else:
-                        GPs[p] = gt_lls_by_indiv[indiv][cp] - (np.log(len(cps_to_GTs[cp]))  / np.log(10))
-                    if COPY==3:
-                        print gt_lls_by_indiv[indiv], jk, p, cp, GPs
-                        IPython.embed()
+                        GLs[p] = gt_lls_by_indiv[indiv][cp] - (np.log(len(cps_to_GTs[cp]))  / np.log(10))
+                        PLs[p] = GLs[p] == -1000 and 1000 or int(round(-10*GLs[p]))
                         
-                sGPs = ",".join(["%.2f"%l for l in GPs])
-                s="{GT}:{COPY}:{GPs}:{CNP}".format(COPY=COPY,
-                                                   GT=GT,
-                                                   CNP=s_CNP,
-                                                   GPs = sGPs)
+                sGLs = ",".join(["%.2f"%l for l in GLs])
+                sPLs = ",".join(["%d"%l for l in PLs])
+                s="{GT}:{COPY}:{GLs}:{PLs}:{CNL}".format(GT=GT,
+                                                         COPY=COPY,
+                                                         GLs = sGLs,
+                                                         PLs=sPLs,
+                                                         CNL=s_CNL)
                                               
                 V_data.append(s)
             else:

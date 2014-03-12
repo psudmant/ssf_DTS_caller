@@ -880,9 +880,27 @@ def get_intersection(G1, G2, ws, tol=0.01):
         return None, None, 1, 1 
 
     y = al*eval_G(G1, x) 
+    
+    k=5
+    mn = ui - k*si
+    mx = uj + k*sj
 
-    mn = ui - 5*si
-    mx = uj + 5*sj
+    o_gran_mx = (mx-x)/tol
+    o_gran_mn = (x-mn)/tol
+    
+    while np.absolute((mx-x)/tol)>1e7 and k>2:
+        mn = ui - k*si
+        mx = uj + k*sj
+        k-=.2
+    
+    if o_gran_mx!=(mx-x)/tol:
+        print "\tgaussian intercept granularity reduction:", o_gran_mx, (mx-x)/tol, k
+        print "\tgaussian intercept granularity reduction:", o_gran_mn, (x-mn)/tol, k
+
+    if np.absolute((mx-x)/tol)>1e7:
+        return None, None, 1, 1 
+
+
     xis = np.arange(x,mx, tol)
     xjs = np.arange(mn,x, tol)
 

@@ -12,7 +12,7 @@ import time
 import cluster
 from get_windowed_variance import get_windowed_variance
 import genotyper as gt
-
+import IPython
 
 def get_min_max(cc):
     mn = 9e9
@@ -67,6 +67,7 @@ if __name__=='__main__':
     tbx_dups = pysam.Tabixfile(o.fn_dup_tabix)
     callset_clust = cluster.cluster_callsets(o.fn_call_table, contig)
     g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs, fn_fa=o.fn_fa)
+
     F_gt = open(o.fn_gt_out,'w')
     F_VCF = open(o.fn_vcf_out,'w')
     F_call = open(o.fn_call_out,'w')

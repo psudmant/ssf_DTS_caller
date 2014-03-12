@@ -123,7 +123,6 @@ if __name__=='__main__':
             else:
                 for i, s_e in enumerate(s_e_segs):
                     s,e = s_e
-                    print s, e
                     inc_indivs = include_indivs[i]
                     gt.output(g, contig, s, e, F_gt, F_call, F_filt,F_VCF, filt, include_indivs=inc_indivs, plot=do_plot, v=verbose)  
 

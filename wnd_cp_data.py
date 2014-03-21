@@ -12,8 +12,8 @@ class dCGH():
         return self.get_cp_ratio_by_chr(chr,correct)
 
     def get_cp_ratio_by_chr(self,chr,correct=True):
-        sample_cps = self.wnd_cp_ref.get_cps_by_chr(chr,correct=correct)
-        ref_cps = self.wnd_cp_test.get_cps_by_chr(chr,correct=correct)
+        ref_cps = self.wnd_cp_ref.get_cps_by_chr(chr,correct=correct)
+        sample_cps = self.wnd_cp_test.get_cps_by_chr(chr,correct=correct)
 
         ratios = np.log(np.cast[np.float32](sample_cps/ref_cps))/np.log(2)
         

@@ -1188,7 +1188,8 @@ class genotyper:
         t = time.time()
         print >>stderr, "done (%fs)"%(time.time()-t)
         
-        self.fasta = FastaHack(fn_fasta)
+        if o.fn_fasta:
+            self.fasta = FastaHack(fn_fasta)
        
     def addGMM(self, gmm, ax, X, labels, overlaps=None):
         

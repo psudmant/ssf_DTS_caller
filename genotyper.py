@@ -840,6 +840,10 @@ def eval_G(G, x):
     return y
 
 def get_intersection(G1, G2, ws, tol=0.01):
+    """
+    Get the integral of the shared area between two gaussians
+    the intersection is computed exactly, but the integral is computed numerically
+    """
     tol = min(ws)/1000
     #sort so G1.mu < G2.mu
     #ui < uj

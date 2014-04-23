@@ -101,7 +101,7 @@ def get_intersection(G1, G2, ws, tol=0.01):
 
 def plot_G(ax, Gs, weights, intersect):
     
-    G_x=np.arange(0,5,.01)
+    G_x=np.arange(0,5,.001)
     l = len(Gs)
     G_ys = []
     for i in xrange(l):
@@ -138,11 +138,15 @@ if __name__=="__main__":
     
     Gs = [[1.96,.3*.3], [2.8,.17*.17]]
     weights = [.85,.15]
+
+    Gs = [[0,1.0000000000000001e-05*1.0000000000000001e-05], [0.015190999999999967,1.000000002439455e-05*1.000000002439455e-05]]
+    weights = [0.94444444444444153,1-0.94444444444444153]
     
     ix,iy, fi, fj = get_intersection(Gs[0], Gs[1], weights, tol=0.001)
     print ix, iy, fi, fj
 
     plot_G(axarr[0], Gs, weights, [ix,iy])   
+    axarr[0].set_xlim(0,.1)
     fig.savefig("./test_overlap.png")
     plt.close()
 

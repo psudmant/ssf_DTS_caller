@@ -1472,7 +1472,6 @@ class genotyper:
 
         ####NOW, finally merge calls that are too close 
         n_labels = np.unique(labels).shape[0] 
-        print params, bics
         if n_labels>1:
             gmm, labels = self.final_call_merge(gmm, labels, mus) 
 

@@ -35,6 +35,7 @@ from sets import Set
 from scipy.stats.mstats import mode
 
 import IPython
+import pdb
 
 
 class call:
@@ -594,7 +595,43 @@ class GMM_gt(object):
         self.all_uniq_labels = np.array(self.all_uniq_labels)
         self.all_uniq_mus = np.array(self.all_uniq_mus)
 
-    
+   
+    def simple_plot(self, fn_out):
+
+        cps = self.mus
+        plt.rc('grid',color='0.75',linestyle='l',linewidth='0.1')
+        fig, ax_arr = plt.subplots(1,2)
+        fig.set_figwidth(8)
+        fig.set_figheight(5)
+        axescolor  = '#f6f6f6'
+        print ax_arr 
+        print self.bics
+        print self.params
+
+        ax_arr[1].plot(self.params, self.bics)
+
+        n, bins, patches = ax_arr[0].hist(cps,alpha=.9,ec='none',normed=1,color='#8DABFC',bins=len(cps)/10)
+        #self.addGMM(gX.gmm, axarr[1,1], cps, gX.labels, overlaps)
+        
+        G_x=np.arange(0,max(cps)+1,.1)
+        l = self.gmm.means.shape[0]
+        
+        for i in xrange(l):
+            c = cm.hsv(float(i)/l,1)
+            mu = self.gmm.means[i,0]
+            var = self.gmm.covars[i][0][0]
+
+            G_y = mlab.normpdf(G_x, mu, var**.5)*self.gmm.weights[i]
+            ax_arr[0].plot(G_x,G_y,color=c)
+            ax_arr[0].plot(mu,-.001,"^",ms=10,alpha=.7,color=c)
+        
+        if np.amax(cps)<2:
+            ax_arr[0].set_xlim(0,2)
+        ylims = ax_arr[0].get_ylim()
+        if ylims[1] > 10:
+            ax_arr[0].set_ylim(0,10)
+
+        fig.savefig(fn_out)
 
     def correct_order_proportion(self):
         #wnd_proportion_dir
@@ -1372,7 +1409,8 @@ class genotyper:
         #vars = np.array([v[0][0] for v in gmm.covars])
         #gmm.covars = np.reshape()
 
-        gmm.fit(X, n_iter=n_iter, init_params='c')
+        #gmm.fit(X, n_iter=n_iter, init_params='c')
+        gmm.fit(X, n_iter=n_iter, init_params='wmc')
         labels = gmm.predict(X)
         
         bic = -2*gmm.score(X).sum() + (3*n_components)*np.log(X.shape[0])
@@ -1434,6 +1472,7 @@ class genotyper:
 
         ####NOW, finally merge calls that are too close 
         n_labels = np.unique(labels).shape[0] 
+        print params, bics
         if n_labels>1:
             gmm, labels = self.final_call_merge(gmm, labels, mus) 
 
@@ -1446,15 +1485,16 @@ class genotyper:
         """
         take the final min_bic call and merge calls that are too close   
         """
+        #max_overlap=8
+
         u_o, med_o, overlaps = assess_GT_overlaps(gmm)
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
-        
         n_labels = np.unique(labels).shape[0] 
         while max(max_overlap_stat['os']) > max_overlap and n_labels>1:
             u1, u2 = max_overlap_stat['us'] 
             l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
             labels[labels==l2] = l1
-
+            
             init_mus, init_vars, init_weights = self.initialize(mus, labels) 
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=0)
 
@@ -1462,14 +1502,12 @@ class genotyper:
             if n_labels>1:
                 u_o, med_o, overlaps = assess_GT_overlaps(gmm)
                 max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
-        
+
         n_labels = np.unique(labels).shape[0] 
 
         if n_labels==1:
             return gmm, labels
         
-        print gmm.means
-
         u_o, med_o, overlaps = assess_GT_overlaps(gmm)
         max_overlap_stat = sorted(overlaps, key = lambda x: np.absolute(x['us'][0]-x['us'][1]))[0]
         d = np.absolute(max_overlap_stat['us'][0]- max_overlap_stat['us'][1])

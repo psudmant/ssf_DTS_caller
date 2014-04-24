@@ -561,8 +561,7 @@ class GMM_gt(object):
         self.weights = self.gmm.weights
         
         self.indivs = indivs 
-        self.best_idx = self.bics.index(self.min_bic) 
-        self.n_clusts = self.params[self.best_idx]
+        self.n_clusts = np.unique(self.labels).shape[0]
         
         self.n_wnds = self.X.shape[1]
 

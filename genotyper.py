@@ -600,9 +600,9 @@ class GMM_gt(object):
 
         cps = self.mus
         plt.rc('grid',color='0.75',linestyle='l',linewidth='0.1')
-        fig, ax_arr = plt.subplots(1,2)
-        fig.set_figwidth(8)
-        fig.set_figheight(5)
+        fig, ax_arr = plt.subplots(1,3)
+        fig.set_figwidth(9)
+        fig.set_figheight(4)
         axescolor  = '#f6f6f6'
         print ax_arr 
         print self.bics
@@ -630,6 +630,11 @@ class GMM_gt(object):
         ylims = ax_arr[0].get_ylim()
         if ylims[1] > 10:
             ax_arr[0].set_ylim(0,10)
+
+        fig.sca(ax_arr[2]) 
+        dendro = hclust.dendrogram(self.Z, orientation='right')
+        ylims = ax_arr[2].get_ylim()
+        ax_arr[2].set_ylim(ylims[0]-1, ylims[1]+1)
 
         fig.savefig(fn_out)
 
@@ -1398,25 +1403,36 @@ class genotyper:
         return metrics.silhouette_score(X, labels) 
     
     def fit_GMM(self, X, init_means, init_vars, init_weights, n_iter=1000):
-    
+        min_covar=1e-5
         n_components = len(init_means)
         #gmm = mixture.GMM(n_components, 'spherical')
         #gmm = mixture.GMM(n_components, 'diag')
-        gmm = mixture.GMM(n_components, 'spherical', min_covar=1e-10)
+        gmm = mixture.GMM(n_components, 'spherical', min_covar=min_covar)
         gmm.means = np.reshape(np.array(init_means),(len(init_means),1))
         gmm.weights = np.array(init_weights)
         
-        #vars = np.array([v[0][0] for v in gmm.covars])
-        #gmm.covars = np.reshape()
-
+        #covars = np.array([v[0][0] for v in gmm.covars])
+        #covars = np.array([np.reshape(np.array([max(v, min_covar)]),(1,1)) for v in init_vars])
+        covars = np.array([max(v, min_covar)for v in init_vars])
+        gmm.covars = covars
+        
         #gmm.fit(X, n_iter=n_iter, init_params='c')
-        gmm.fit(X, n_iter=n_iter, init_params='wmc')
+        #gmm.fit(X, n_iter=n_iter, init_params='cmw')
+        #gmm.fit(X, n_iter=n_iter, init_params='c')
+        gmm.fit(X, n_iter=n_iter, init_params='')
+        
         labels = gmm.predict(X)
         
         bic = -2*gmm.score(X).sum() + (3*n_components)*np.log(X.shape[0])
         aic = -2*gmm.score(X).sum() + 2*(3*n_components)
         
-        return gmm, labels, bic 
+        #print np.unique(labels)
+        #for i,l in enumerate(list(np.unique(labels))):
+        #    print init_means[i], init_vars[i], init_weights[i], gmm.score(X)[labels==l].sum() 
+        #print bic
+
+        #pdb.set_trace()
+        return gmm, labels, aic 
     
 
     def GMM_genotype(self, X, include_indivs = None, FOUT = None):
@@ -1455,6 +1471,7 @@ class genotyper:
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
             
             if len(init_mus)>30 and len(bics)>0: continue
+            #pdb.set_trace()
             
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 
@@ -1466,6 +1483,9 @@ class genotyper:
             
         print "done %fs"%(time.time()-t)
         idx = np.argmin(bics)
+        #print params
+        #print np.where(np.array(params)==3)
+        #idx = np.where(np.array(params)==3)[0][0]
         gmm = gmms[idx]
         labels = all_labels[idx]
         
@@ -1480,7 +1500,7 @@ class genotyper:
             
         return GMM_gt(X, gmm, labels, Z, params, bics, include_indivs)
 
-    def final_call_merge(self, gmm, labels,mus, max_overlap=0.5, min_dist=0.15):
+    def final_call_merge(self, gmm, labels,mus, max_overlap=0.5, min_dist=0.5):
         """
         take the final min_bic call and merge calls that are too close   
         """
@@ -1489,13 +1509,14 @@ class genotyper:
         u_o, med_o, overlaps = assess_GT_overlaps(gmm)
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         n_labels = np.unique(labels).shape[0] 
+        #pdb.set_trace()
         while max(max_overlap_stat['os']) > max_overlap and n_labels>1:
             u1, u2 = max_overlap_stat['us'] 
             l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
             labels[labels==l2] = l1
             
             init_mus, init_vars, init_weights = self.initialize(mus, labels) 
-            gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=0)
+            gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=1000)
 
             n_labels = np.unique(labels).shape[0] 
             if n_labels>1:
@@ -1503,6 +1524,7 @@ class genotyper:
                 max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
 
         n_labels = np.unique(labels).shape[0] 
+        #pdb.set_trace()
 
         if n_labels==1:
             return gmm, labels

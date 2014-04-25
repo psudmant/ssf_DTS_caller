@@ -995,7 +995,7 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, F_VCF, filt, include_indivs=No
     print "%s %d %d"%(contig, s, e)
     stdout.flush()
 
-    if len(include_indivs) == 1:
+    if include_indivs!=None and len(include_indivs) == 1:
         return
     
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)

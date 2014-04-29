@@ -617,7 +617,7 @@ class indiv_call_cluster:
         self.calls.append(call)
         self.all_starts.append(call['start'])
         self.all_ends.append(call['end'])
-        self.ref_indivs.append(call['indiv_ref'])
+        self.ref_indivs.append(str(call['indiv_ref']))
         self.size+=1
     
     def over_simplify(self):

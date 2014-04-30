@@ -535,7 +535,7 @@ def get_best_gt(call, contig, g):
     
 
 class filter_obj:
-    def __init__(self, min_max_mu_d, max_overlap, filter_X_linked=False, sex_lambda=None, p_thresh=1e-10):
+    def __init__(self, min_max_mu_d, max_overlap, max_mu_cp, filter_X_linked=False, sex_lambda=None, p_thresh=1e-10):
         """
         min_max_mu_d - the minumum acceptible distance between gaussians for
         the maximum distance of any fit - ie, make sure that there is at least 
@@ -546,6 +546,7 @@ class filter_obj:
         """
         self.min_max_mu_d = min_max_mu_d
         self.max_overlap = max_overlap
+        self.max_mu_cp = max_mu_cp
 
         self.filter_X_linked = filter_X_linked
         self.p_thresh=p_thresh
@@ -560,20 +561,24 @@ class filter_obj:
         
         label_counts = [[label,np.sum(labels==label)] for label in u_labels]
         max_labs = [l[0] for l in sorted(label_counts, key=lambda x: -x[1])[:2]]
-
+    
         #print "l\tfemale\tmale"
         rs=[]
         for label in max_labs:
             #print label, np.sum((labels==label)&is_female) , np.sum((labels==label)&(~is_female)) 
             rs.append([np.sum((labels==label)&is_female) , np.sum((labels==label)&(~is_female))])
         obs =  np.array(rs)
+
+        #if np.amin(np.sum(obs,1))<3:
+        #    return False
+
         odds, p = fisher_exact(obs)
-        
-        print "Fishers-exact:",p
+        print "Fisher exact:", p
 
         if p<self.p_thresh:
             return True
-        
+
+        return False        
 class GMM_gt(object):
 
     def __init__(self, X, gmm, labels, Z, params, bics, indivs):
@@ -750,6 +755,9 @@ class GMM_gt(object):
         if (max_mu_d < filt.min_max_mu_d):
             return True
         
+        if np.mean(self.mus)>filt.max_mu_cp:
+            return True
+
         if filt.filter_X_linked and filt.is_X_linked(self.indivs, self.labels):
             return True
 
@@ -1146,12 +1154,12 @@ class genotyper:
             SVTYPE="DEL"
         else:
             SVTYPE="CNV"
-
+        
         INFO="END=%d;SVTYPE=%s;LPROBS=%.2f"%(e, SVTYPE ,np.sum(gX.l_probs))
         V_outstr = V_outstr.format(CHROM=VCF_contig,
                                    POS=s+1,
                                    ID="%s_%d_%d"%(contig, s+1, e),
-                                   REF=self.fasta['%s:%d'%(VCF_contig,s)],
+                                   REF=self.fasta['%s:%d'%(VCF_contig,s+1)],
                                    ALT=ALTS,
                                    QUAL='.',
                                    INFO=INFO,

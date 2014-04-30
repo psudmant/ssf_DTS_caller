@@ -750,9 +750,8 @@ class GMM_gt(object):
         if (max_mu_d < filt.min_max_mu_d):
             return True
         
-        if filt.filter_X_linked:
-            if filt.is_X_linked(self.indivs, self.labels)
-                return True
+        if filt.filter_X_linked and filt.is_X_linked(self.indivs, self.labels):
+            return True
 
         return False
         

@@ -44,6 +44,11 @@ if __name__=='__main__':
     opts.add_option('','--genome_fa',dest='fn_fa', default="/net/eichler/vol7/home/psudmant/genomes/fastas/hg19_1kg_phase2_reference/human_g1k_v37.fasta")
     
     opts.add_option('','--do_plot',dest='do_plot',action="store_true",default=False)
+    opts.add_option('','--filter_X_linked',
+                       dest='filter_X_linked',
+                       action="store_true",
+                       default=False,
+                       help="""perform a chi-squared test on calls to see if x-linked and discard if they are""")
     
     opts.add_option('','--simplify_complex_eval',
                     dest='simplify_complex_eval',
@@ -84,19 +89,16 @@ if __name__=='__main__':
 
     g.setup_output(F_gt, F_filt, F_VCF)
     k=-1
-
-    filt = gt.filter_obj(o.min_max_mu_d, o.max_overlap)
+    
+    filt = gt.filter_obj(o.min_max_mu_d, o.max_overlap, filter_X_linked = o.filter_X_linked)
      
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
         mn, mx = get_min_max(overlapping_call_clusts)
            
-        #if contig == "chr2" and not (mx>=242817287 and mn<=243191022): continue
-        #if contig == "chr20" and not (mx>=16567242 and mn<=16587150): continue
-        #if contig == "chr20" and not (mx>=356222 and mn<=368698): continue
-        #if contig == "chr20" and not (mx>=16077807 and mn<=16085653): continue
-        #if contig == "chr20" and not (mx>=6648036 and mn<=6656183): continue
-        #if contig == "chr6" and not (mx>=151476852 and mn<=151495535): continue
-         
+        #if contig == "chr2" and not (mx>=75061454 and mn<=75061866): continue
+        #if contig == "chr2" and not (mx>=181927132 and mn<=181928581): continue
+        #if contig == "chr2" and not (mx>=216225164 and mn<=216226790): continue
+
         """
         2 cases
         1. there is one call in the cluster - simply output the call w/ genotypes

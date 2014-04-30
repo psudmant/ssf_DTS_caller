@@ -15,7 +15,6 @@ from sklearn import cluster
 from sklearn import metrics
 from sklearn import mixture
 
-
 from fastahack import FastaHack
 
 from sets import Set
@@ -23,6 +22,7 @@ from sets import Set
 import math
 import random
 from scipy.stats import norm
+from scipy.stats import fisher_exact
 
 import scipy.spatial.distance as dist
 import scipy.cluster.hierarchy as hclust
@@ -535,7 +535,7 @@ def get_best_gt(call, contig, g):
     
 
 class filter_obj:
-    def __init__(self, min_max_mu_d, max_overlap):
+    def __init__(self, min_max_mu_d, max_overlap, filter_X_linked=False, sex_lambda=None, p_thresh=1e-10):
         """
         min_max_mu_d - the minumum acceptible distance between gaussians for
         the maximum distance of any fit - ie, make sure that there is at least 
@@ -546,6 +546,33 @@ class filter_obj:
         """
         self.min_max_mu_d = min_max_mu_d
         self.max_overlap = max_overlap
+
+        self.filter_X_linked = filter_X_linked
+        self.p_thresh=p_thresh
+        if sex_lambda:
+            self.sex_lambda = sex_lambda
+        else:
+            self.sex_lambda = lambda x: x.rsplit("_",2)[-1]
+    
+    def is_X_linked(self, indivs, labels):
+        u_labels = list(np.unique(labels))
+        is_female = np.array([self.sex_lambda(indiv)=="F" for indiv in indivs])
+        
+        label_counts = [[label,np.sum(labels==label)] for label in u_labels]
+        max_labs = [l[0] for l in sorted(label_counts, key=lambda x: -x[1])[:2]]
+
+        #print "l\tfemale\tmale"
+        rs=[]
+        for label in max_labs:
+            #print label, np.sum((labels==label)&is_female) , np.sum((labels==label)&(~is_female)) 
+            rs.append([np.sum((labels==label)&is_female) , np.sum((labels==label)&(~is_female))])
+        obs =  np.array(rs)
+        odds, p = fisher_exact(obs)
+        
+        print "Fishers-exact:",p
+
+        if p<self.p_thresh:
+            return True
         
 class GMM_gt(object):
 
@@ -722,6 +749,10 @@ class GMM_gt(object):
         
         if (max_mu_d < filt.min_max_mu_d):
             return True
+        
+        if filt.filter_X_linked:
+            if filt.is_X_linked(self.indivs, self.labels)
+                return True
 
         return False
         
@@ -1312,7 +1343,13 @@ class genotyper:
         axarr[0,0].set_xlim(-0.10,max(cps)+1)
         axarr[0,0].set_ylim(-0.10,max(sunk_cps)+1)
         
-        n, bins, patches = axarr[1,1].hist(cps,alpha=.9,ec='none',normed=1,color='#8DABFC',bins=len(cps)/10)
+
+        if len(cps)<30:
+            b = len(cps)/3
+        else:
+            b = len(cps)/10
+
+        n, bins, patches = axarr[1,1].hist(cps,alpha=.9,ec='none',normed=1,color='#8DABFC',bins=b)
         self.addGMM(gX.gmm, axarr[1,1], cps, gX.labels, overlaps)
         
         fig.sca(axarr[0,2]) 
@@ -1322,7 +1359,7 @@ class genotyper:
         #self.aug_dendrogram(axarr[0,2], dendro)
         
         if np.sum(np.isnan(sunk_cps)) == 0:
-            n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,color='#FCDE8D',bins=len(cps)/10)
+            n, bins, patches = axarr[1,0].hist(sunk_cps,alpha=.9,ec='none',normed=1,color='#FCDE8D',bins=b)
             self.addGMM(gXs.gmm, axarr[1,0], sunk_cps, gXs.labels)
             axarr[0,1].plot(gX.params, gX.bics, 'ro', ms=5)
             axarr[0,1].plot(gXs.params, gXs.bics, 'go', ms=5)

@@ -1018,6 +1018,7 @@ class cluster_callsets(object):
         
         y=-.2
         y2=-.2
+        #the individual clusters
         for j, call_clust in enumerate(overlapping_call_clusts):
 
             axes[1,0].plot([np.median(call_clust.starts), np.median(call_clust.ends)], [y2,y2], colors[j%n_colors], lw=1.5)
@@ -1028,6 +1029,8 @@ class cluster_callsets(object):
                 y-=.1
             y-=.2
         
+
+        #all the little sub-bits
         y2-=.5
         for s_e in s_es:
             axes[1,0].plot(s_e, [y2,y2], 'r', lw=2.5)
@@ -1051,7 +1054,8 @@ class cluster_callsets(object):
         #fig.colorbar(p, cax=axes[0,1])
 
         y3=0
-        i=0
+        i=0 
+        #each indivs cnv segs
         for indiv, cnv_segs in cnv_segs_by_indiv.iteritems():
             for seg in cnv_segs:
                 axes[0,1].plot(seg,[y3,y3], colors[i%n_colors], lw=1.5)

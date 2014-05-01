@@ -537,12 +537,19 @@ def get_best_gt(call, contig, g):
 class filter_obj:
     def __init__(self, min_max_mu_d, max_overlap, max_mu_cp, filter_X_linked=False, sex_lambda=None, p_thresh=1e-10):
         """
-        min_max_mu_d - the minumum acceptible distance between gaussians for
+        min_max_mu_d: the minumum acceptible distance between gaussians for
         the maximum distance of any fit - ie, make sure that there is at least 
         one pair of adjacent guassians that looks at least this good
 
-        max_mu_overlap - the maximum mean of the overlaps between
+        max_mu_overlap: the maximum mean of the overlaps between
         adjacent fit gaussians to be accepted
+    
+        max_mu_cp: ignore any copy number variation in regions where the mean of all 
+        the states is > max_mu_cp
+
+        filter_X_linked: do a Fishers-exact test to see if there is male/female bias 
+        in a call suggesting that X-chr paralogy is the culprit
+
         """
         self.min_max_mu_d = min_max_mu_d
         self.max_overlap = max_overlap

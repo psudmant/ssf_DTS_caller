@@ -62,14 +62,27 @@ if __name__=='__main__':
     opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=float,default=0.5)
     opts.add_option('','--filter_max_overlap', dest='max_overlap',type=float,default=0.5)
     opts.add_option('','--max_mu_cp', dest='max_mu_cp',type=float,default=1000)
+    opts.add_option('','--target_loci', dest='fn_target_loci',default=None)
     
     (o, args) = opts.parse_args()
     
     subset_indivs = o.subset_indivs
     if subset_indivs!=None:
         subset_indivs = subset_indivs.split(":")
-
+    
     contig = o.contig
+    
+    target_loci = None
+    
+    if o.fn_target_loci!=None:
+        target_loci = []
+        for l in open(o.fn_target_loci):
+            c,s,e = l.rstrip().split()
+            s,e = int(s), int(e)
+            if c == contig: target_loci.append([c,s,e])
+            
+            
+
     tbx_dups = pysam.Tabixfile(o.fn_dup_tabix)
     callset_clust = cluster.cluster_callsets(o.fn_call_table, contig)
     g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs, fn_fa=o.fn_fa)
@@ -99,6 +112,12 @@ if __name__=='__main__':
         #if contig == "chr2" and not (mx>=75061454 and mn<=75061866): continue
         #if contig == "chr2" and not (mx>=181927132 and mn<=181928581): continue
         #if contig == "chr2" and not (mx>=216225164 and mn<=216226790): continue
+        if target_loci:
+            for t in target_loci:
+                if (mx>=t[1] and mn<=t[2]):
+                    break
+            else:
+                continue
 
         """
         2 cases

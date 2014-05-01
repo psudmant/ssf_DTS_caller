@@ -133,7 +133,7 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
         plt.gcf().clear()
         """
 
-    return c, off_diag
+    return c, off_diag, mus
 
 def get_correlated_segments(all_starts_ends, g, contig, r_cutoff, outdir, do_plot=False):
     """
@@ -145,7 +145,12 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff, outdir, do_plo
     
     all_starts_ends = sorted(np.unique(all_starts_ends))
     
-    c, off_diag = get_correlation_matrix(all_starts_ends, g, contig, outdir=outdir, do_plot=do_plot)
+    c, off_diag, mus = get_correlation_matrix(all_starts_ends, g, contig, outdir=outdir, do_plot=do_plot)
+    
+    #a hack to try to simplify highly duplicated regions a lil bit
+    if np.mean(mus)>10:
+        r_cutoff=0.7
+
     #print all_starts_ends 
     original_c = c
     prev_gts = None
@@ -163,7 +168,7 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff, outdir, do_plo
         #print off_diag
         #print all_starts_ends 
         if len(all_starts_ends) == 2: break
-        c, off_diag = get_correlation_matrix(all_starts_ends, g, contig)
+        c, off_diag, mus = get_correlation_matrix(all_starts_ends, g, contig)
 
     s_e_tups = []
     for i in xrange(len(all_starts_ends)-1):
@@ -358,6 +363,9 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.
     #    s_e_segs.append([all_starts_ends[i], all_starts_ends[i+1]])
 
     t = time.time()
+    """
+    now remove the non-varying chunks
+    """
     print "getting var chunks..."
     #THIS IS EATING UP TIME
     CNV_segs, CNV_gXs = filter_invariant_segs(s_e_segs, g, contig) 

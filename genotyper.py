@@ -567,7 +567,7 @@ def get_best_gt(call, contig, g):
     
 
 class filter_obj:
-    def __init__(self, min_max_mu_d, max_overlap, max_mu_cp, filter_X_linked=False, sex_lambda=None, p_thresh=1e-10):
+    def __init__(self, min_max_mu_d, max_overlap, max_mu_cp, singleton_min_sigma, filter_X_linked=False, sex_lambda=None, p_thresh=1e-10):
         """
         min_max_mu_d: the minumum acceptible distance between gaussians for
         the maximum distance of any fit - ie, make sure that there is at least 
@@ -586,6 +586,7 @@ class filter_obj:
         self.min_max_mu_d = min_max_mu_d
         self.max_overlap = max_overlap
         self.max_mu_cp = max_mu_cp
+        self.singleton_min_sigma = singleton_min_sigma
 
         self.filter_X_linked = filter_X_linked
         self.p_thresh=p_thresh
@@ -783,23 +784,43 @@ class GMM_gt(object):
             return True
 
         u_o, med_o, overlaps = assess_GT_overlaps(self.gmm)
-        
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         
+        """
+        filter by the overlap between adjacent clusters
+        """
         if max(max_overlap_stat['os'])>=filt.max_overlap:
             return True
 
         mu_mu_d, min_mu_d, max_mu_d = self.get_mean_min_max_inter_mu_dist()
         
+        """ 
+        filter by the maximum distance between clusters, 
+        it must be greater tham min
+        """
         if (max_mu_d < filt.min_max_mu_d):
             return True
-        
+
+        """
+        filter out regions with really high copy
+        """
         if np.mean(self.mus)>filt.max_mu_cp:
             return True
-
+        
+        """
+        if flagged, then test for x-linked association and remove  
+        """
         if filt.filter_X_linked and filt.is_X_linked(self.indivs, self.labels):
             return True
-
+        
+        """
+        if singleton, impose strict theshold
+        """
+        if  ( self.n_clusts == 2 ) and ( min(np.sum(self.labels==l) for l in np.unique(self.labels)) == 1 ):
+            min_z = self.get_min_z_dist()
+            if min_z < filt.singleton_min_sigma:
+                return True
+        
         return False
         
         #mean_mu_delta = self.get_mean_inter_mu_dist()

@@ -59,6 +59,7 @@ if __name__=='__main__':
                             each uniquely to a set of individuals is long and works only 
                             really well for high-coverage genomes""")
     
+    opts.add_option('','--singleton_min_sigma',dest='singleton_min_sigma',type=float,default=6.3)
     opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=float,default=0.5)
     opts.add_option('','--filter_max_overlap', dest='max_overlap',type=float,default=0.5)
     opts.add_option('','--max_mu_cp', dest='max_mu_cp',type=float,default=1000)
@@ -104,7 +105,11 @@ if __name__=='__main__':
     g.setup_output(F_gt, F_filt, F_VCF)
     k=-1
     
-    filt = gt.filter_obj(o.min_max_mu_d, o.max_overlap,o.max_mu_cp, filter_X_linked = o.filter_X_linked)
+    filt = gt.filter_obj(o.min_max_mu_d, 
+                         o.max_overlap,
+                         o.max_mu_cp, 
+                         o.singleton_min_sigma,
+                         filter_X_linked = o.filter_X_linked)
      
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):
         mn, mx = get_min_max(overlapping_call_clusts)

@@ -149,7 +149,7 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff, outdir, do_plo
     
     #a hack to try to simplify highly duplicated regions a lil bit
     if np.mean(mus)>10:
-        r_cutoff=0.7
+        r_cutoff=0.65
 
     #print all_starts_ends 
     original_c = c
@@ -174,7 +174,7 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff, outdir, do_plo
     for i in xrange(len(all_starts_ends)-1):
         s_e_tups.append([all_starts_ends[i], all_starts_ends[i+1]])
     
-    return s_e_tups, original_c
+    return s_e_tups, original_c, mus
 
 def cluster_segs(segs, max_frac_uniq=0.2):
     clust = m_cluster.call_cluster()
@@ -334,7 +334,7 @@ def cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, max_uniq_thresh):
     return new_inds_by_seg
                 
      
-def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.65, plot=False):
+def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.9, plot=False):
     """
     First chop up into ALL constituate parts
     """
@@ -353,9 +353,10 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.
     #commented for now...
     """
 
-    r_cutoff=.9
-    s_e_segs, c = get_correlated_segments(all_starts_ends, g, contig, r_cutoff, "./plotting/test", do_plot=plot)
-
+    s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, r_cutoff, "./plotting/test", do_plot=plot)
+   
+    mu_cp = np.mean(mus) 
+    
     print "%d segs merged to %d correlated segs"%(len(all_starts_ends), len(s_e_segs))
     #instead of correlation cleaning, use below 4
     #all_starts_ends = sorted(np.unique(all_starts_ends))
@@ -399,16 +400,38 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.
                     indivs_by_cnv_segs[s_e_tup] = []
                 indivs_by_cnv_segs[s_e_tup].append(indiv)
         
-        indivs_by_grp, segs_by_grp = cluster_indivs(cnv_segs_by_indiv,g, 0.85, max_frac_uniq=.1) 
+        """
+        if high copy, then force more clustering
+
+        max_uniq_thresh: this is the cluster threshold for the clustering of individual segments together
+
+        max_frac_uniq: when clustering individuals by their similar sets of overlapping calls, this is 
+        the fraction of below which if two individuals are different we just group them together
+        this has to happen for high copy regions because they are so nasty
+        """
+        
+        max_uniq_thresh=0.3
+        max_frac_uniq=.1
+
+        if mu_cp>10:
+            max_frac_uniq=.5
+            max_uniq_thresh=0.7
+        elif mu_cp>20:
+            max_frac_uniq=.9
+            max_uniq_thresh=0.85
+
+        indivs_by_grp, segs_by_grp = cluster_indivs(cnv_segs_by_indiv,g, 0.85, max_frac_uniq=max_frac_uniq) 
         indivs_by_cnv_segs = get_segs_from_clustered_indivs(indivs_by_grp, segs_by_grp, indivs_by_cnv_segs, g)
         
-        #finally cluster these?????
+        #finally cluster these
+
         if len(indivs_by_cnv_segs.keys())>1:
-            indivs_by_cnv_segs = cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, 0.3)
+            indivs_by_cnv_segs = cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, max_uniq_thresh)
         
         if plot: 
             m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test", g, indivs_by_cnv_segs, [], CNV_segs, cnv_segs_by_indiv)
         
+        #pdb.set_trace()
         #m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
         s_e_segs = []
         indivs_to_assess = []
@@ -795,8 +818,8 @@ class GMM_gt(object):
         mu_mu_d, min_mu_d, max_mu_d = self.get_mean_min_max_inter_mu_dist()
 
         n_wnds = self.n_wnds
-        #min_z = self.get_min_z_dist()
-        min_z = -1
+        min_z = self.get_min_z_dist()
+        
         bic_delta = self.get_bic_delta() 
         
         F_filt.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\n".format(contig, s, e, 
@@ -1037,8 +1060,9 @@ def assess_GT_overlaps(gmm):
         t = w1+w2
         w1, w2 = w1/t, w2/t
         x, y, o1, o2 = get_intersection(G1, G2, [w1,w2], tol=0.01)
+        s_dist=[np.absolute(u_1-u_2)/s1,np.absolute(u_1-u_2)/s2]
         all_os+=[o1,o2]
-        overlaps.append({"us":tuple([u_1,u_2]),"os":tuple([o1, o2]),"ss":tuple([s1,s2]), "ws":tuple([w1,w2])})
+        overlaps.append({"us":tuple([u_1,u_2]),"os":tuple([o1, o2]),"ss":tuple([s1,s2]), "ws":tuple([w1,w2]), "sdist":tuple(s_dist)})
     
     u_o, med_o = np.mean(all_os), np.median(all_os)
     return u_o, med_o, overlaps
@@ -1086,11 +1110,12 @@ class genotyper:
         VCF_outstr = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s\n"%("\t".join(self.indivs))
         F_VCF.write(VCF_outstr)
         
-        FFILT.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\n".format("chr", 
+        FFILT.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\n".format("chr", 
                                                                  "start", 
                                                                  "end", 
                                                                  "mu_mu_d", 
                                                                  "max_mu_d", 
+                                                                 "min_mu_d", 
                                                                  "f_correct_direction",
                                                                  "min_z",
                                                                  "wnd_size", 
@@ -1465,7 +1490,8 @@ class genotyper:
         return metrics.silhouette_score(X, labels) 
     
     def fit_GMM(self, X, init_means, init_vars, init_weights, n_iter=1000):
-        min_covar=1e-5
+        #min_covar=1e-5
+        min_covar=1e-4
         n_components = len(init_means)
         #gmm = mixture.GMM(n_components, 'spherical')
         #gmm = mixture.GMM(n_components, 'diag')
@@ -1562,7 +1588,7 @@ class genotyper:
             
         return GMM_gt(X, gmm, labels, Z, params, bics, include_indivs)
 
-    def final_call_merge(self, gmm, labels,mus, max_overlap=0.5, min_dist=0.5):
+    def final_call_merge(self, gmm, labels,mus, max_overlap=0.5, min_dist=0.6):
         """
         take the final min_bic call and merge calls that are too close   
         """
@@ -1572,7 +1598,7 @@ class genotyper:
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         n_labels = np.unique(labels).shape[0] 
         #pdb.set_trace()
-        while max(max_overlap_stat['os']) > max_overlap and n_labels>1:
+        while (max(max_overlap_stat['os']) > max_overlap) and n_labels>1:
             u1, u2 = max_overlap_stat['us'] 
             l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
             labels[labels==l2] = l1
@@ -1594,13 +1620,19 @@ class genotyper:
         u_o, med_o, overlaps = assess_GT_overlaps(gmm)
         max_overlap_stat = sorted(overlaps, key = lambda x: np.absolute(x['us'][0]-x['us'][1]))[0]
         d = np.absolute(max_overlap_stat['us'][0]- max_overlap_stat['us'][1])
-        while d < min_dist and n_labels>1:
+        #note, this is the min_sd of the max_overlap... 
+        #maybe this is always the min_sd? but, perhaps not??
+        sd = min(max_overlap_stat['sdist'])
+
+        
+        print overlaps
+        while (d < min_dist ) and n_labels>1:
             u1, u2 = max_overlap_stat['us'] 
             l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
             labels[labels==l2] = l1
             
             init_mus, init_vars, init_weights = self.initialize(mus, labels) 
-            gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=0)
+            gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=1000)
 
             u_o, med_o, overlaps = assess_GT_overlaps(gmm)
             print overlaps
@@ -1609,6 +1641,7 @@ class genotyper:
             if n_labels>1:
                 max_overlap_stat = sorted(overlaps, key = lambda x: np.absolute(x['us'][0]-x['us'][1]))[0]
                 d = np.absolute(max_overlap_stat['us'][0]- max_overlap_stat['us'][1])
+                sd = min(max_overlap_stat['sdist'])
         
         return gmm, labels
 

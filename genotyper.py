@@ -797,7 +797,7 @@ class GMM_gt(object):
         
         """ 
         filter by the maximum distance between clusters, 
-        it must be greater tham min
+        it must be greater than min
         """
         if (max_mu_d < filt.min_max_mu_d):
             return True

@@ -60,6 +60,7 @@ if __name__=='__main__':
                             really well for high-coverage genomes""")
     
     opts.add_option('','--singleton_min_sigma',dest='singleton_min_sigma',type=float,default=6.3)
+    opts.add_option('','--dup_min_sigma',dest='dup_min_sigma',type=float,default=5)
     opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=float,default=0.5)
     opts.add_option('','--filter_max_overlap', dest='max_overlap',type=float,default=0.5)
     opts.add_option('','--max_mu_cp', dest='max_mu_cp',type=float,default=1000)
@@ -81,8 +82,6 @@ if __name__=='__main__':
             c,s,e = l.rstrip().split()
             s,e = int(s), int(e)
             if c == contig: target_loci.append([c,s,e])
-            
-            
 
     tbx_dups = pysam.Tabixfile(o.fn_dup_tabix)
     callset_clust = cluster.cluster_callsets(o.fn_call_table, contig)
@@ -109,6 +108,7 @@ if __name__=='__main__':
                          o.max_overlap,
                          o.max_mu_cp, 
                          o.singleton_min_sigma,
+                         o.dup_min_sigma,
                          filter_X_linked = o.filter_X_linked)
      
     for overlapping_call_clusts in callset_clust.get_overlapping_call_clusts(o.total_subsets, o.subset):

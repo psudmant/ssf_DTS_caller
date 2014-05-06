@@ -567,7 +567,7 @@ def get_best_gt(call, contig, g):
     
 
 class filter_obj:
-    def __init__(self, min_max_mu_d, max_overlap, max_mu_cp, singleton_min_sigma, filter_X_linked=False, sex_lambda=None, p_thresh=1e-10):
+    def __init__(self, min_max_mu_d, max_overlap, max_mu_cp, singleton_min_sigma, dup_min_sigma, filter_X_linked=False, sex_lambda=None, p_thresh=1e-10):
         """
         min_max_mu_d: the minumum acceptible distance between gaussians for
         the maximum distance of any fit - ie, make sure that there is at least 
@@ -587,6 +587,7 @@ class filter_obj:
         self.max_overlap = max_overlap
         self.max_mu_cp = max_mu_cp
         self.singleton_min_sigma = singleton_min_sigma
+        self.dup_min_sigma = dup_min_sigma
 
         self.filter_X_linked = filter_X_linked
         self.p_thresh=p_thresh
@@ -821,6 +822,15 @@ class GMM_gt(object):
             if min_z < filt.singleton_min_sigma:
                 return True
         
+        """
+        if a dup, force stricter genotype filtering
+        gts_by_indiv, gts_to_label, labels_to_gt = gX.get_gts_by_indiv()
+        """
+        if (np.max(self.mus>2.5)):
+            min_z = self.get_min_z_dist()
+            if min_z < filt.dup_min_sigma:
+                return True
+            
         return False
         
         #mean_mu_delta = self.get_mean_inter_mu_dist()
@@ -1413,8 +1423,8 @@ class genotyper:
         axarr[0,0].set_ylim(-0.10,max(sunk_cps)+1)
         
 
-        if len(cps)<30:
-            b = len(cps)/3
+        if len(cps)<=50:
+            b = len(cps)/2
         else:
             b = len(cps)/10
 

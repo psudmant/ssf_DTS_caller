@@ -44,11 +44,6 @@ if __name__=='__main__':
     opts.add_option('','--genome_fa',dest='fn_fa', default="/net/eichler/vol7/home/psudmant/genomes/fastas/hg19_1kg_phase2_reference/human_g1k_v37.fasta")
     
     opts.add_option('','--do_plot',dest='do_plot',action="store_true",default=False)
-    opts.add_option('','--filter_X_linked',
-                       dest='filter_X_linked',
-                       action="store_true",
-                       default=False,
-                       help="""perform a chi-squared test on calls to see if x-linked and discard if they are""")
     
     opts.add_option('','--simplify_complex_eval',
                     dest='simplify_complex_eval',
@@ -59,11 +54,23 @@ if __name__=='__main__':
                             each uniquely to a set of individuals is long and works only 
                             really well for high-coverage genomes""")
     
+    """
+    genotype filtering options
+    """
     opts.add_option('','--singleton_min_sigma',dest='singleton_min_sigma',type=float,default=6.3)
     opts.add_option('','--dup_min_sigma',dest='dup_min_sigma',type=float,default=5)
     opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=float,default=0.5)
     opts.add_option('','--filter_max_overlap', dest='max_overlap',type=float,default=0.5)
     opts.add_option('','--max_mu_cp', dest='max_mu_cp',type=float,default=1000)
+    opts.add_option('','--filter_X_linked',
+                       dest='filter_X_linked',
+                       action="store_true",
+                       default=False,
+                       help="""perform a chi-squared test on calls to see if x-linked and discard if they are""")
+
+    """
+    target a distinct ste of regions for genotyping
+    """
     opts.add_option('','--target_loci', dest='fn_target_loci',default=None)
     
     (o, args) = opts.parse_args()

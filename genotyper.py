@@ -788,7 +788,7 @@ class GMM_gt(object):
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         
         """
-        filter by the overlap between adjacent clusters
+        filter by the fractional overlap between adjacent clusters
         """
         if max(max_overlap_stat['os'])>=filt.max_overlap:
             return True

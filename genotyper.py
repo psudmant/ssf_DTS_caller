@@ -826,7 +826,7 @@ class GMM_gt(object):
         if a dup, force stricter genotype filtering
         gts_by_indiv, gts_to_label, labels_to_gt = gX.get_gts_by_indiv()
         """
-        if (np.max(self.mus>2.5)):
+        if (np.amax(self.mus)>2.5):
             min_z = self.get_min_z_dist()
             if min_z < filt.dup_min_sigma:
                 return True

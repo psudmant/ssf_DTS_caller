@@ -58,7 +58,7 @@ if __name__=='__main__':
     genotype filtering options
     """
     opts.add_option('','--singleton_min_sigma',dest='singleton_min_sigma',type=float,default=6.3)
-    opts.add_option('','--dup_min_sigma',dest='dup_min_sigma',type=float,default=5)
+    opts.add_option('','--dup_min_sigma',dest='dup_min_sigma',type=float,default=0)
     opts.add_option('','--filter_min_max_mu_d',dest='min_max_mu_d',type=float,default=0.5)
     opts.add_option('','--filter_max_overlap', dest='max_overlap',type=float,default=0.5)
     opts.add_option('','--max_mu_cp', dest='max_mu_cp',type=float,default=1000)

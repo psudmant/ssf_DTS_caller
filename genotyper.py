@@ -72,7 +72,7 @@ class genotype_table:
 
 
 
-def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
+def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False, append=""):
     
     n_indivs = len(g.indivs)
     l = len(starts_ends)-1
@@ -104,7 +104,7 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
         fig, axes = plt.subplots(2)
         p = axes[0].pcolor(c)
         fig.colorbar(p, cax=axes[1])
-        plt.savefig("%s/%s_cor_%d_%d_bps.png"%(outdir, contig, min_s, max_e))
+        plt.savefig("%s/%s_cor_%d_%d_bps%s.png"%(outdir, contig, min_s, max_e, append))
         """
         #PLOT INDIVIDUAL CORRELATIONS
         plt.gcf().clear()
@@ -135,7 +135,7 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False):
 
     return c, off_diag, mus
 
-def get_correlated_segments(all_starts_ends, g, contig, r_cutoff, outdir, do_plot=False):
+def get_correlated_segments(all_starts_ends, g, contig, f_r_cutoff, outdir, do_plot=False):
     """
     take a set of coordinates representing starts and ends
     over a locus and cluster them into contiguous chunks that
@@ -147,14 +147,14 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff, outdir, do_plo
     
     c, off_diag, mus = get_correlation_matrix(all_starts_ends, g, contig, outdir=outdir, do_plot=do_plot)
     
-    #a hack to try to simplify highly duplicated regions a lil bit
-    if np.mean(mus)>10:
-        r_cutoff=0.65
-
+    #merge based on a sliding scale based on copy 
+    r_cutoff = f_r_cutoff(np.mean(mus)) 
     #print all_starts_ends 
     original_c = c
     prev_gts = None
+    count = 0
     while(np.amax(off_diag)>r_cutoff):
+        count+=1
         to_pop = []
         for i in xrange(len(all_starts_ends)-2):
             if np.absolute(off_diag[i])>=r_cutoff:
@@ -168,12 +168,13 @@ def get_correlated_segments(all_starts_ends, g, contig, r_cutoff, outdir, do_plo
         #print off_diag
         #print all_starts_ends 
         if len(all_starts_ends) == 2: break
-        c, off_diag, mus = get_correlation_matrix(all_starts_ends, g, contig)
+        c, off_diag, mus = get_correlation_matrix(all_starts_ends, g, contig, outdir=outdir, do_plot=do_plot, append = "_merge_%d"%count)
 
     s_e_tups = []
     for i in xrange(len(all_starts_ends)-1):
         s_e_tups.append([all_starts_ends[i], all_starts_ends[i+1]])
     
+    pdb.set_trace()
     return s_e_tups, original_c, mus
 
 def cluster_segs(segs, max_frac_uniq=0.2):
@@ -334,7 +335,7 @@ def cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, max_uniq_thresh):
     return new_inds_by_seg
                 
      
-def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = 0.9, plot=False):
+def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = lambda x: (0.9/x)+0.5, plot=False):
     """
     First chop up into ALL constituate parts
     """
@@ -848,19 +849,24 @@ class GMM_gt(object):
         
         mu_mu_d, min_mu_d, max_mu_d = self.get_mean_min_max_inter_mu_dist()
 
+        n_clusts = self.n_clusts 
+        min_AC = min(np.sum(self.labels==l) for l in np.unique(self.labels))
+
         n_wnds = self.n_wnds
         min_z = self.get_min_z_dist()
         
         bic_delta = self.get_bic_delta() 
         
-        F_filt.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\n".format(contig, s, e, 
+        F_filt.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\n".format(contig, s, e, 
                                                                          mu_mu_d, 
                                                                          max_mu_d, 
                                                                          min_mu_d, 
                                                                          self.f_correct,
                                                                          min_z, 
                                                                          n_wnds,
-                                                                         bic_delta))
+                                                                         bic_delta,
+                                                                         n_clusts,
+                                                                         min_AC))
     
     def get_mean_min_max_inter_mu_dist(self):
         s_mus = np.sort(self.all_uniq_mus)
@@ -1141,7 +1147,7 @@ class genotyper:
         VCF_outstr = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s\n"%("\t".join(self.indivs))
         F_VCF.write(VCF_outstr)
         
-        FFILT.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\n".format("chr", 
+        FFILT.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\n".format("chr", 
                                                                  "start", 
                                                                  "end", 
                                                                  "mu_mu_d", 
@@ -1150,7 +1156,9 @@ class genotyper:
                                                                  "f_correct_direction",
                                                                  "min_z",
                                                                  "wnd_size", 
-                                                                 "bic_delta"))
+                                                                 "bic_delta",
+                                                                 "n_clusts",
+                                                                 "min_allele_count"))
 
     def output(self, FOUT, F_VCF, gX, contig, s, e, v=False):
         
@@ -1208,8 +1216,7 @@ class genotyper:
 
         """
         VCF OUTPUT
-        GT:CN:CNP:GP:PL
-            
+        GT:CN:CNL:GL:PL
         CN = copy number
         CNP = Copy Number likelihood
 
@@ -1554,11 +1561,16 @@ class genotyper:
         return gmm, labels, aic 
     
 
-    def GMM_genotype(self, X, include_indivs = None, FOUT = None):
+    def GMM_genotype(self, X, include_indivs = None, FOUT = None, overload_indivs = None):
         """
         GMM genotyping
         merge_overlap_thresh, if -1, don't ever merge, however, 
         otherwise, if overlap > merge_overlap_thresh, then merge and recalculate 
+        
+        include indivs: only genotype a subset of indivs in the gt object
+
+        overlaod indivs: this is if the gt object has nothing to do with the X you are
+                         passing to the function
         """
         if include_indivs:
             l = len(include_indivs)
@@ -1569,7 +1581,7 @@ class genotyper:
                 new_X[i] = X[j] 
                 
             X=new_X
-                    
+       
         mus = np.mean(X,1)
         mus = np.reshape(mus, (mus.shape[0],1))
         dist_mat = dist.pdist(mus)
@@ -1616,8 +1628,11 @@ class genotyper:
 
         if include_indivs == None: 
             include_indivs = self.indivs
-            
-        return GMM_gt(X, gmm, labels, Z, params, bics, include_indivs)
+        
+        if overload_indivs != None:
+            return GMM_gt(X, gmm, labels, Z, params, bics, overload_indivs)
+        else:
+            return GMM_gt(X, gmm, labels, Z, params, bics, include_indivs)
 
     def final_call_merge(self, gmm, labels,mus, max_overlap=0.5, min_dist=0.6):
         """

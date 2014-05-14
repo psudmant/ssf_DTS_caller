@@ -156,6 +156,9 @@ class gglob:
             
             sunk_cp_matrix = sunk_cp_matrix[new_indivs_idxs,:] 
             indivs = new_indivs
+        
+        #for i,indiv in enumerate(indivs):
+        #    print indiv, np.mean(cp_matrix[i]), np.median(cp_matrix[i])
 
         return cls(indivs = indivs,
                    wnd_size = wnd_size,

@@ -349,7 +349,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = la
     if len(CNV_segs) <= 1 or non_adjacent(CNV_segs):
         indivs_to_assess = [None for i in s_e_segs]
         exclude_loci = [None for i in s_e_segs]
-        return s_e_segs, indivs_to_assess, True
+        return CNV_segs, indivs_to_assess, True
     
     else:
 

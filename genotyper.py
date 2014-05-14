@@ -326,7 +326,6 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = la
     #merge correllated calls
     #commented for now...
     """
-
     s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, r_cutoff, "./plotting/test", do_plot=plot)
    
     mu_cp = np.mean(mus) 
@@ -594,6 +593,7 @@ class filter_obj:
             return True
 
         return False        
+
 class GMM_gt(object):
 
     def __init__(self, X, gmm, labels, Z, params, bics, indivs):
@@ -1558,10 +1558,10 @@ class genotyper:
         mus = np.mean(X,1)
         mus = np.reshape(mus, (mus.shape[0],1))
         dist_mat = dist.pdist(mus)
-        print "h_clustering..."
+        #print "h_clustering..."
         t = time.time()
         Z = hclust.linkage(mus, method='centroid', metric='euclidean')
-        print "done %fs"%(time.time()-t)
+        #print "done %fs"%(time.time()-t)
         params, bics, gmms, all_labels = [], [], [], []
         
         print "assessing genotypes" 
@@ -1643,8 +1643,6 @@ class genotyper:
         #maybe this is always the min_sd? but, perhaps not??
         sd = min(max_overlap_stat['sdist'])
 
-        
-        print overlaps
         while (d < min_dist ) and n_labels>1:
             u1, u2 = max_overlap_stat['us'] 
             l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
@@ -1654,7 +1652,6 @@ class genotyper:
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=1000)
 
             u_o, med_o, overlaps = assess_GT_overlaps(gmm)
-            print overlaps
             n_labels = np.unique(labels).shape[0] 
 
             if n_labels>1:

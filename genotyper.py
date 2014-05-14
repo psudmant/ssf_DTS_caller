@@ -53,27 +53,27 @@ class genotype_table:
     def __init__(self, gtyper):
         self.gtyper = gtyper
         self.calls = []
-    
+
     def add(self, chr, start, end, X, labels, s):
         self.calls.append(call(chr, start, end, X, labels, s))
-    
+
     def output(self, fn):
-        
+
         indiv_str = "\t".join(self.gtyper.indivs)
         header="chr\tstart\tend\ts\t%s"%indiv_str
         with open(fn, 'w') as F:
             for call in self.calls:
                 F.write("%s\t%d\t%d\t%f\t%s\n"%(call.chr,
-                                call.start,
-                                call.end,
-                                call.s,
-                                "\t".join([str(l) for l in call.labels])))
+                    call.start,
+                    call.end,
+                    call.s,
+                    "\t".join([str(l) for l in call.labels])))
 
 
 
 
 def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False, append=""):
-    
+
     n_indivs = len(g.indivs)
     l = len(starts_ends)-1
     mus = np.zeros((n_indivs,l))
@@ -83,21 +83,21 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False, a
     n_indivs = len(g.indivs)
     l = len(starts_ends)-1
     mus = np.zeros((l,n_indivs))
-    
+
     min_s, max_e = starts_ends[0], starts_ends[-1]
     for i in xrange(l):
         s, e = starts_ends[i], starts_ends[i+1] 
         X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
         mus[i,:] = np.mean(X,1)   
         print contig, s, e
-    
+
     c =  np.corrcoef(mus)
-    
+
     #zero out diagnals
     off_diag = []
     for j in xrange(c.shape[0]-1):
         off_diag.append(c[j,j+1])
-    
+
     if do_plot:
         print "PLAAAAAAATING!"
         plt.gcf().set_size_inches(14,6)
@@ -105,34 +105,7 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False, a
         p = axes[0].pcolor(c)
         fig.colorbar(p, cax=axes[1])
         plt.savefig("%s/%s_cor_%d_%d_bps%s.png"%(outdir, contig, min_s, max_e, append))
-        """
-        #PLOT INDIVIDUAL CORRELATIONS
-        plt.gcf().clear()
-        
-        d = int(np.floor(np.sqrt(l)))+1
-        plt.gcf().set_size_inches(18,10)
-        
-        fig, axes = plt.subplots(d,d)
-        
-        font = {'family' : 'normal', 'weight': 'normal', 'size': 4} 
-        matplotlib.rc('font', **font)
-        
-        for i in xrange(d): 
-            for j in xrange(d): 
-                mus[0]
-                #p = (j*d)+i
-                p = (i*d)+j
-                if p<l-1:
-                    axes[i,j].plot(mus[p], mus[p+1],'b.', ms=.1)
-                    min_x, max_y = np.amin(mus[p]), (np.amin(mus[p+1])+np.amax(mus[p+1]))/2.0
-                    axes[i,j].text(min_x,max_y,"%.2f"%off_diag[p], fontsize=4)
-                    axes[i,j].text(min_x,max_y-.5,"%d"%starts_ends[p+1], fontsize=4)
-                    axes[i,j].xaxis.set_tick_params(width=1)
-                    axes[i,j].yaxis.set_tick_params(width=1)
-        plt.savefig("%s/%s_i_cors_%d_%d_bps.pdf"%(outdir, contig, min_s, max_e))
-        plt.gcf().clear()
-        """
-
+    
     return c, off_diag, mus
 
 def get_correlated_segments(all_starts_ends, g, contig, f_r_cutoff, outdir, do_plot=False):
@@ -142,11 +115,11 @@ def get_correlated_segments(all_starts_ends, g, contig, f_r_cutoff, outdir, do_p
     likely represent the same underlying call as a result of their
     high correlation
     """
-    
+
     all_starts_ends = sorted(np.unique(all_starts_ends))
-    
+
     c, off_diag, mus = get_correlation_matrix(all_starts_ends, g, contig, outdir=outdir, do_plot=do_plot)
-    
+
     #merge based on a sliding scale based on copy 
     r_cutoff = f_r_cutoff(np.mean(mus)) 
     #print all_starts_ends 
@@ -174,7 +147,7 @@ def get_correlated_segments(all_starts_ends, g, contig, f_r_cutoff, outdir, do_p
     for i in xrange(len(all_starts_ends)-1):
         s_e_tups.append([all_starts_ends[i], all_starts_ends[i+1]])
     
-    pdb.set_trace()
+    #pdb.set_trace()
     return s_e_tups, original_c, mus
 
 def cluster_segs(segs, max_frac_uniq=0.2):

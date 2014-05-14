@@ -308,7 +308,7 @@ def cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, max_uniq_thresh):
     return new_inds_by_seg
                 
      
-def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = lambda x: (0.9/x)+0.5, plot=False):
+def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = lambda x: min((0.9/x)+0.5,0.9), plot=False):
     """
     First chop up into ALL constituate parts
     """
@@ -329,7 +329,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = la
     s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, r_cutoff, "./plotting/test", do_plot=plot)
    
     mu_cp = np.mean(mus) 
-    
+    pdb.set_trace() 
     print "%d segs merged to %d correlated segs"%(len(all_starts_ends), len(s_e_segs))
     #instead of correlation cleaning, use below 4
     #all_starts_ends = sorted(np.unique(all_starts_ends))

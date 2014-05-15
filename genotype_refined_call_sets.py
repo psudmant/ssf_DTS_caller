@@ -68,6 +68,7 @@ if __name__=='__main__':
                        action="store_true",
                        default=False,
                        help="""perform a chi-squared test on calls to see if x-linked and discard if they are""")
+    opts.add_option('','--force_output_all', dest='force_output_all', default=False, action="store_true")
 
     """
     target a distinct ste of regions for genotyping
@@ -160,6 +161,7 @@ if __name__=='__main__':
                 for i, s_e in enumerate(s_e_segs):
                     s,e = s_e
                     inc_indivs = include_indivs[i]
+                    if o.force_output_all: inc_indivs = None
                     gt.output(g, contig, s, e, F_gt, F_call, F_filt,F_VCF, filt, include_indivs=inc_indivs, plot=do_plot, v=verbose)  
 
     F_gt.close()

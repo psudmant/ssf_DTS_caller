@@ -109,10 +109,14 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False, a
     return c, off_diag, mus
 
 def get_r_cutoffs(mus, lambda_r_cutoff):
-    mu_array = np.mean(mus,1)
-    csum = np.cumsum(mu_array) 
-    pair_mus = (np.r_[csum[1], csum[2:]-csum[:-2]])/2.0
-    r_cutoffs = lambda_r_cutoff(pair_mus) 
+    #mu_array = np.mean(mus,1)
+    x = np.mean(mus,1)
+    #csum = np.cumsum(mu_array) 
+    #pair_mus = (np.r_[csum[1], csum[2:]-csum[:-2]])/2.0
+    pairs = np.c_[x[:-1],x[1:]]
+    min_pairs =np.amin(pairs,1) 
+
+    r_cutoffs = lambda_r_cutoff(min_pairs) 
     return r_cutoffs
 
 def get_correlated_segments(all_starts_ends, g, contig, lambda_r_cutoff, outdir, do_plot=False):
@@ -321,7 +325,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
     First chop up into ALL constituate parts
     """
     
-    lambda_r_cutoff = lambda x: np.fmin((0.9/x)+0.5,np.ones(x.shape[0])*0.9)
+    lambda_r_cutoff = lambda x: np.fmin((0.90/(x**.6))+0.5,np.ones(x.shape[0])*0.90)
 
     all_starts_ends = []
     min_s, max_e = 9e9, -1
@@ -336,7 +340,6 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
     #merge correllated calls
     #commented for now...
     """
-    pdb.set_trace()
     s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, lambda_r_cutoff, "./plotting/test", do_plot=plot)
      
     mu_cp = np.mean(mus) 

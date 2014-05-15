@@ -329,7 +329,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = la
     s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, r_cutoff, "./plotting/test", do_plot=plot)
    
     mu_cp = np.mean(mus) 
-    pdb.set_trace() 
+    #pdb.set_trace() 
     print "%d segs merged to %d correlated segs"%(len(all_starts_ends), len(s_e_segs))
     #instead of correlation cleaning, use below 4
     #all_starts_ends = sorted(np.unique(all_starts_ends))

@@ -147,7 +147,6 @@ def get_correlated_segments(all_starts_ends, g, contig, f_r_cutoff, outdir, do_p
     for i in xrange(len(all_starts_ends)-1):
         s_e_tups.append([all_starts_ends[i], all_starts_ends[i+1]])
     
-    #pdb.set_trace()
     return s_e_tups, original_c, mus
 
 def cluster_segs(segs, max_frac_uniq=0.2):
@@ -326,10 +325,10 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = la
     #merge correllated calls
     #commented for now...
     """
+    pdb.set_trace() 
     s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, r_cutoff, "./plotting/test", do_plot=plot)
    
     mu_cp = np.mean(mus) 
-    #pdb.set_trace() 
     print "%d segs merged to %d correlated segs"%(len(all_starts_ends), len(s_e_segs))
     #instead of correlation cleaning, use below 4
     #all_starts_ends = sorted(np.unique(all_starts_ends))
@@ -404,7 +403,6 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = la
         if plot: 
             m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test", g, indivs_by_cnv_segs, [], CNV_segs, cnv_segs_by_indiv)
         
-        #pdb.set_trace()
         #m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
         s_e_segs = []
         indivs_to_assess = []
@@ -590,6 +588,7 @@ class filter_obj:
         print "Fisher exact:", p
 
         if p<self.p_thresh:
+            print obs
             return True
 
         return False        
@@ -1089,7 +1088,6 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, F_VCF, filt, include_indivs=No
     X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
     gX = g.GMM_genotype(X, include_indivs = include_indivs)
     u_o, med_o, overlaps = assess_GT_overlaps(gX.gmm)
-
     if gX.fail_filter(filt):
         print "***********FAILED************"
     if gX.n_clusts ==1:  
@@ -1530,7 +1528,6 @@ class genotyper:
         #    print init_means[i], init_vars[i], init_weights[i], gmm.score(X)[labels==l].sum() 
         #print bic
 
-        #pdb.set_trace()
         return gmm, labels, aic 
     
 
@@ -1575,7 +1572,6 @@ class genotyper:
             init_mus, init_vars, init_weights = self.initialize(mus, grps) 
             
             if len(init_mus)>30 and len(bics)>0: continue
-            #pdb.set_trace()
             
             gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights)
 
@@ -1616,7 +1612,6 @@ class genotyper:
         u_o, med_o, overlaps = assess_GT_overlaps(gmm)
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         n_labels = np.unique(labels).shape[0] 
-        #pdb.set_trace()
         while (max(max_overlap_stat['os']) > max_overlap) and n_labels>1:
             u1, u2 = max_overlap_stat['us'] 
             l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
@@ -1631,7 +1626,6 @@ class genotyper:
                 max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
 
         n_labels = np.unique(labels).shape[0] 
-        #pdb.set_trace()
 
         if n_labels==1:
             return gmm, labels

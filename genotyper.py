@@ -108,7 +108,14 @@ def get_correlation_matrix(starts_ends, g, contig, outdir=None, do_plot=False, a
     
     return c, off_diag, mus
 
-def get_correlated_segments(all_starts_ends, g, contig, f_r_cutoff, outdir, do_plot=False):
+def get_r_cutoffs(mus, lambda_r_cutoff):
+    mu_array = np.mean(mus,1)
+    csum = np.cumsum(mu_array) 
+    pair_mus = (np.r_[csum[1], csum[2:]-csum[:-2]])/2.0
+    r_cutoffs = lambda_r_cutoff(pair_mus) 
+    return r_cutoffs
+
+def get_correlated_segments(all_starts_ends, g, contig, lambda_r_cutoff, outdir, do_plot=False):
     """
     take a set of coordinates representing starts and ends
     over a locus and cluster them into contiguous chunks that
@@ -121,16 +128,16 @@ def get_correlated_segments(all_starts_ends, g, contig, f_r_cutoff, outdir, do_p
     c, off_diag, mus = get_correlation_matrix(all_starts_ends, g, contig, outdir=outdir, do_plot=do_plot)
 
     #merge based on a sliding scale based on copy 
-    r_cutoff = f_r_cutoff(np.mean(mus)) 
-    #print all_starts_ends 
+    r_cutoffs = get_r_cutoffs(mus, lambda_r_cutoff) 
+
     original_c = c
     prev_gts = None
     count = 0
-    while(np.amax(off_diag)>r_cutoff):
+    while(np.any(off_diag>r_cutoffs)):
         count+=1
         to_pop = []
         for i in xrange(len(all_starts_ends)-2):
-            if np.absolute(off_diag[i])>=r_cutoff:
+            if np.absolute(off_diag[i])>=r_cutoffs[i]:
                 to_pop.append(i+1)
         new_positions = [] 
         for i, v in enumerate(all_starts_ends):
@@ -138,10 +145,12 @@ def get_correlated_segments(all_starts_ends, g, contig, f_r_cutoff, outdir, do_p
                 new_positions.append(v)
        
         all_starts_ends = np.unique(new_positions)
-        #print off_diag
-        #print all_starts_ends 
-        if len(all_starts_ends) == 2: break
+
+        if len(all_starts_ends) == 2: 
+            break
+
         c, off_diag, mus = get_correlation_matrix(all_starts_ends, g, contig, outdir=outdir, do_plot=do_plot, append = "_merge_%d"%count)
+        r_cutoffs = get_r_cutoffs(mus, lambda_r_cutoff) 
 
     s_e_tups = []
     for i in xrange(len(all_starts_ends)-1):
@@ -307,11 +316,13 @@ def cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, max_uniq_thresh):
     return new_inds_by_seg
                 
      
-def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = lambda x: min((0.9/x)+0.5,0.9), plot=False):
+def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
     """
     First chop up into ALL constituate parts
     """
     
+    lambda_r_cutoff = lambda x: np.fmin((0.9/x)+0.5,np.ones(x.shape[0])*0.9)
+
     all_starts_ends = []
     min_s, max_e = 9e9, -1
     for clust in overlapping_call_clusts: 
@@ -325,16 +336,11 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, r_cutoff = la
     #merge correllated calls
     #commented for now...
     """
-    pdb.set_trace() 
-    s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, r_cutoff, "./plotting/test", do_plot=plot)
-   
+    pdb.set_trace()
+    s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, lambda_r_cutoff, "./plotting/test", do_plot=plot)
+     
     mu_cp = np.mean(mus) 
     print "%d segs merged to %d correlated segs"%(len(all_starts_ends), len(s_e_segs))
-    #instead of correlation cleaning, use below 4
-    #all_starts_ends = sorted(np.unique(all_starts_ends))
-    #s_e_segs = []
-    #for i in xrange(len(all_starts_ends)-1):
-    #    s_e_segs.append([all_starts_ends[i], all_starts_ends[i+1]])
 
     t = time.time()
     """

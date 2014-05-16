@@ -692,74 +692,6 @@ class GMM_gt(object):
 
         fig.savefig(fn_out)
 
-    def correct_order_proportion(self):
-        #wnd_proportion_dir
-        sorted_mus = np.sort(self.all_uniq_mus)
-        labels = np.array(self.labels)
-        if len(sorted_mus)==1: return 0.0
-        
-        t = 0 
-        p = 0
-        
-        for i in xrange(sorted_mus.shape[0]-1):
-            mu_0 = sorted_mus[i]
-            l_0 = self.mu_to_labels[mu_0]
-            
-            mu_1 = sorted_mus[i+1]
-            l_1 = self.mu_to_labels[mu_1]
-
-            assert mu_0<mu_1
-            
-            wl_0 = np.where(labels==l_0)
-            wl_1 = np.where(labels==l_1)
-            t+=self.X.shape[1]
-            """
-            COULD traverse in...
-            """
-            #print self.X.shape
-            #print self.X[wl_0,:]
-            #print self.X[wl_1,:]
-            #print wl_0[0].shape, wl_1[0].shape
-            #print np.amax(self.X[wl_0,:], 1), np.amin(self.X[wl_1,:], 1)
-            s=np.sum(np.amax(self.X[wl_0,:], 1)<np.amin(self.X[wl_1,:], 1))
-            s2=np.sum(np.median(self.X[wl_0,:], 1)<np.median(self.X[wl_1,:], 1))
-            p+=s
-            #print "\t", mu_0, l_0, mu_1, l_1, s, self.X.shape[1], s/float(self.X.shape[1]),s2/float(self.X.shape[1])      
-        
-        return float(p)/t
-    
-    def get_min_z_dist(self):
-
-        min_z_dist = 9e9
-
-        sorted_mus = np.sort(self.all_uniq_mus)
-        labels = np.array(self.labels)
-        
-        delta = np.diff(sorted_mus)
-        std_lefts = []
-        std_rights = []
-
-        for i in xrange(sorted_mus.shape[0]-1):
-            mu_left = sorted_mus[i]
-            mu_right = sorted_mus[i+1]
-            
-            l_left = self.mu_to_labels[mu_left]
-            l_right = self.mu_to_labels[mu_right]
-            
-            std_left = max(1e-9, self.label_to_std[l_left])
-            std_right = max(1e-9, self.label_to_std[l_right])
-            
-            std_lefts.append(std_left)
-            std_rights.append(std_right)
-        
-        std_lefts = np.array(std_lefts)
-        std_rights = np.array(std_rights)
-
-        min_l = np.amin(np.absolute(delta/std_lefts)) 
-        min_r = np.amin(np.absolute(delta/std_rights)) 
-        
-        return min(min_l, min_r)
-
 
     def fail_filter(self, filt):
         
@@ -838,17 +770,98 @@ class GMM_gt(object):
         
         bic_delta = self.get_bic_delta() 
         
-        F_filt.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\n".format(contig, s, e, 
-                                                                         mu_mu_d, 
-                                                                         max_mu_d, 
-                                                                         min_mu_d, 
-                                                                         self.f_correct,
-                                                                         min_z, 
-                                                                         n_wnds,
-                                                                         bic_delta,
-                                                                         n_clusts,
-                                                                         min_AC))
+        Lscore = self.get_Lscore()
+
+        F_filt.write("%s\n"%s("\t".join(["{0}".format(v) for v in [contig, 
+                                                                   s, 
+                                                                   e,
+                                                                   mu_mu_d, 
+                                                                   max_mu_d, 
+                                                                   min_mu_d, 
+                                                                   self.f_correct,
+                                                                   min_z, 
+                                                                   n_wnds,
+                                                                   bic_delta,
+                                                                   n_clusts,
+                                                                   min_AC,
+                                                                   Lscore ]])))
+            
+
+    """
+    functions for getting different filtering info 
+    """
+
+    def get_Lscore(self):
+        return np.sum(self.l_probs)  
+        
+    def correct_order_proportion(self):
+        #wnd_proportion_dir
+        sorted_mus = np.sort(self.all_uniq_mus)
+        labels = np.array(self.labels)
+        if len(sorted_mus)==1: return 0.0
+        
+        t = 0 
+        p = 0
+        
+        for i in xrange(sorted_mus.shape[0]-1):
+            mu_0 = sorted_mus[i]
+            l_0 = self.mu_to_labels[mu_0]
+            
+            mu_1 = sorted_mus[i+1]
+            l_1 = self.mu_to_labels[mu_1]
+
+            assert mu_0<mu_1
+            
+            wl_0 = np.where(labels==l_0)
+            wl_1 = np.where(labels==l_1)
+            t+=self.X.shape[1]
+            """
+            COULD traverse in...
+            """
+            #print self.X.shape
+            #print self.X[wl_0,:]
+            #print self.X[wl_1,:]
+            #print wl_0[0].shape, wl_1[0].shape
+            #print np.amax(self.X[wl_0,:], 1), np.amin(self.X[wl_1,:], 1)
+            s=np.sum(np.amax(self.X[wl_0,:], 1)<np.amin(self.X[wl_1,:], 1))
+            s2=np.sum(np.median(self.X[wl_0,:], 1)<np.median(self.X[wl_1,:], 1))
+            p+=s
+            #print "\t", mu_0, l_0, mu_1, l_1, s, self.X.shape[1], s/float(self.X.shape[1]),s2/float(self.X.shape[1])      
+        
+        return float(p)/t
     
+    def get_min_z_dist(self):
+
+        min_z_dist = 9e9
+
+        sorted_mus = np.sort(self.all_uniq_mus)
+        labels = np.array(self.labels)
+        
+        delta = np.diff(sorted_mus)
+        std_lefts = []
+        std_rights = []
+
+        for i in xrange(sorted_mus.shape[0]-1):
+            mu_left = sorted_mus[i]
+            mu_right = sorted_mus[i+1]
+            
+            l_left = self.mu_to_labels[mu_left]
+            l_right = self.mu_to_labels[mu_right]
+            
+            std_left = max(1e-9, self.label_to_std[l_left])
+            std_right = max(1e-9, self.label_to_std[l_right])
+            
+            std_lefts.append(std_left)
+            std_rights.append(std_right)
+        
+        std_lefts = np.array(std_lefts)
+        std_rights = np.array(std_rights)
+
+        min_l = np.amin(np.absolute(delta/std_lefts)) 
+        min_r = np.amin(np.absolute(delta/std_rights)) 
+        
+        return min(min_l, min_r)
+
     def get_mean_min_max_inter_mu_dist(self):
         s_mus = np.sort(self.all_uniq_mus)
         ds = np.diff(s_mus)
@@ -856,6 +869,35 @@ class GMM_gt(object):
             return 0, 0, 0
 
         return np.mean(ds), np.amin(ds), np.amax(ds) 
+
+    def get_gt_lls_by_indiv(self, labels_to_gt):
+        
+
+        gt_lls_by_indiv = {}
+
+        for i, indiv in enumerate(self.indivs):  
+            lls = {gt:max(np.log(self.posterior_probs[i,label])/np.log(10),-1000) for label, gt in labels_to_gt.iteritems() }
+            gt_lls_by_indiv[indiv] = lls 
+
+        return gt_lls_by_indiv
+
+
+    def get_bic_delta(self):
+        
+        if self.n_clusts+1 in self.params:
+            idx_bic_r = self.params.index(self.n_clusts+1) 
+            bic_r = self.bics[idx_bic_r]
+        else:
+            bic_r = self.min_bic
+    
+        if self.n_clusts-1 in self.params:
+            idx_bic_l = self.params.index(self.n_clusts-1) 
+            bic_l = self.bics[idx_bic_l]
+        else:
+            bic_l = self.min_bic
+        
+        delta = bic_r-self.min_bic+bic_l-self.min_bic
+        return delta
         
     def get_gts_by_indiv(self):
         
@@ -918,34 +960,6 @@ class GMM_gt(object):
 
         return gts_by_indiv, gt_to_labels, labels_to_gt
             
-    def get_gt_lls_by_indiv(self, labels_to_gt):
-        
-
-        gt_lls_by_indiv = {}
-
-        for i, indiv in enumerate(self.indivs):  
-            lls = {gt:max(np.log(self.posterior_probs[i,label])/np.log(10),-1000) for label, gt in labels_to_gt.iteritems() }
-            gt_lls_by_indiv[indiv] = lls 
-
-        return gt_lls_by_indiv
-
-
-    def get_bic_delta(self):
-        
-        if self.n_clusts+1 in self.params:
-            idx_bic_r = self.params.index(self.n_clusts+1) 
-            bic_r = self.bics[idx_bic_r]
-        else:
-            bic_r = self.min_bic
-    
-        if self.n_clusts-1 in self.params:
-            idx_bic_l = self.params.index(self.n_clusts-1) 
-            bic_l = self.bics[idx_bic_l]
-        else:
-            bic_l = self.min_bic
-        
-        delta = bic_r-self.min_bic+bic_l-self.min_bic
-        return delta
 
     def get_cp(self, indiv, g):
         
@@ -1106,9 +1120,8 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, F_VCF, filt, include_indivs=No
         return
 
     F_call.write("%s\t%d\t%d\n"%(contig, s, e))
-    g.output(F_gt, F_VCF, gX, contig, s, e, v=v)
+    g.output(F_gt, F_VCF, F_filt, gX, contig, s, e, v=v)
 
-    gX.output_filter_data(F_filt, contig, s, e)
     
      
     if plot:
@@ -1140,7 +1153,7 @@ class genotyper:
                                                                  "n_clusts",
                                                                  "min_allele_count"))
 
-    def output(self, FOUT, F_VCF, gX, contig, s, e, v=False):
+    def output(self, FOUT, F_VCF, F_filt, gX, contig, s, e, v=False):
         
         outstr = "%s\t%d\t%d"%(contig, s, e)
         gts_by_indiv, gts_to_label, labels_to_gt = gX.get_gts_by_indiv()
@@ -1149,7 +1162,7 @@ class genotyper:
         cn_range=range(0,max(cns)+1)
         
         gt_lls_by_indiv = gX.get_gt_lls_by_indiv(labels_to_gt)
-        
+        gX.output_filter_data(F_filt, contig, s, e)
         
         #reference hap_cn is already 1
         hap_cns = [1]

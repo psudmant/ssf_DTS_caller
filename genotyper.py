@@ -777,14 +777,10 @@ class GMM_gt(object):
         min_responsibility = self.get_min_responsibility()
         ll_responsibility = self.get_ll_responsibility()
         
-        min_AC_label = sorted([[np.sum(self.labels==l),l] for l in np.unique(self.labels)], key=lambda x: x[1] )[0][0]
+        min_AC_label = sorted([[np.sum(self.labels==l),l] for l in np.unique(self.labels)], key=lambda x: x[0] )[0][1]
         min_AC_mean_responsibility = self.get_mean_responsibility_by_label(min_AC_label)
         min_AC_l_prob = self.get_l_prob_by_label(min_AC_label)
-
-        singleton_P = self.get_singleton_P()
-        
         entry = info_ob.init_entry()
-
         info_ob.update_entry(entry,"contig", contig)
         info_ob.update_entry(entry,"start", s)
         info_ob.update_entry(entry,"end", e)

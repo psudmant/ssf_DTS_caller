@@ -777,8 +777,9 @@ class GMM_gt(object):
         min_responsibility = self.get_min_responsibility()
         ll_responsibility = self.get_ll_responsibility()
         
-        min_AC_mean_responsibility = self.get_min_AC_mean_responsibility()
-        min_AC_l_prob = self.get_min_AC_l_prob()
+        min_AC_label = sorted([[np.sum(self.labels==l),l] for l in np.unique(self.labels)], key=lambda x: x[1] )[0][0]
+        min_AC_mean_responsibility = self.get_mean_responsibility_by_label(min_AC_label)
+        min_AC_l_prob = self.get_l_prob_by_label(min_AC_label)
 
         singleton_P = self.get_singleton_P()
         
@@ -802,10 +803,8 @@ class GMM_gt(object):
         info_ob.update_entry(entry,"min_responsibility", min_responsibility)
         info_ob.update_entry(entry,"ll_responsibility", ll_responsibility)
         info_ob.update_entry(entry,"is_singleton",(min_AC==1 and n_clusts==2) and 1 or 0)
-
         info_ob.update_entry(entry,"min_AC_mean_responsibility", min_AC_mean_responsibility)
         info_ob.update_entry(entry,"min_AC_lprob",min_AC_l_prob)
-
         info_ob.output_entry(entry)
         
     """
@@ -834,19 +833,15 @@ class GMM_gt(object):
     def get_ll_responsibility(self):
         return np.sum(np.log(self.posterior_probs[np.arange(self.labels.shape[0]),self.labels]))
     
-    def get_min_AC_l_prob(self):
-        min_label = np.sorted([[np.sum(self.labels==l),l] for l in np.unique(self.labels)], key=lambda x: x[1] )[0][0]
-        w_min_label = np.where(labels == min_label)
-        return np.sum(self.lprobs[w_min_label])
+    def get_l_prob_by_label(self, label):
+        w_min_label = np.where(self.labels == label)
+        return np.sum(self.l_probs[w_min_label])
 
-    def get_min_AC_mean_responsibility(self):
-        min_label = np.sorted([[np.sum(self.labels==l),l] for l in np.unique(self.labels)], key=lambda x: x[1] )[0][0]
-        w_min_label = np.where(labels == min_label)
+    def get_mean_responsibility_by_label(self, label):
+        w_min_label = np.where(self.labels == label)
         resps = self.posterior_probs[np.arange(self.labels.shape[0]),self.labels][w_min_label]
         return  np.mean(resps)
     
-
-
     def get_ll_probs(self):
         return np.sum(self.l_probs)  
 

@@ -763,13 +763,23 @@ class GMM_gt(object):
         
         mu_mu_d, min_mu_d, max_mu_d = self.get_mean_min_max_inter_mu_dist()
         n_clusts = self.n_clusts 
+        
         min_AC = min(np.sum(self.labels==l) for l in np.unique(self.labels))
+
         n_wnds = self.n_wnds
         min_z = self.get_min_z_dist()
         bic_delta = self.get_bic_delta() 
         Lscore = self.get_Lscore()
 
         min_inter_label_dist = self.get_min_inter_label_dist()
+
+        mean_responsibility = self.get_mean_responsibility()
+        min_responsibility = self.get_min_responsibility()
+        ll_responsibility = self.get_ll_responsibility()
+        
+        min_AC_mean_responsibility = self.get_min_AC_mean_responsibility()
+        min_AC_l_prob = self.get_min_AC_l_prob()
+
         singleton_P = self.get_singleton_P()
         
         entry = info_ob.init_entry()
@@ -788,21 +798,60 @@ class GMM_gt(object):
         info_ob.update_entry(entry,"min_allele_count", min_AC)
         info_ob.update_entry(entry,"Lscore", Lscore)
         info_ob.update_entry(entry,"min_inter_label_dist",min_inter_label_dist)
-        info_ob.update_entry(entry,"singleton_P",singleton_P)
+        info_ob.update_entry(entry,"mean_responsibility", mean_responsibility)
+        info_ob.update_entry(entry,"min_responsibility", min_responsibility)
+        info_ob.update_entry(entry,"ll_responsibility", ll_responsibility)
+        info_ob.update_entry(entry,"is_singleton",(min_AC==1 and n_clusts==2) and 1 or 0)
+
+        info_ob.update_entry(entry,"min_AC_mean_responsibility", min_AC_mean_responsibility)
+        info_ob.update_entry(entry,"min_AC_lprob",min_AC_l_prob)
 
         info_ob.output_entry(entry)
         
     """
     functions for getting different filtering info 
     """
-    def min_inter_label_dist(self):
+    def get_min_inter_label_dist(self):
         ###
+        args = np.argsort(self.mus)
+        sorted_mus = self.mus[args]
+        sorted_labels = self.labels[args]
 
-    def singleton_P(self):
-        return 0
+        min_d = 9e9
+        for i in xrange(sorted_mus.shape[0]-1):
+            d = np.absolute(sorted_mus[i+1]-sorted_mus[i])
+            if sorted_labels[i]!=sorted_labels[i+1] and d<min_d:
+                min_d = d
+
+        return min_d
+
+    def get_mean_responsibility(self):
+        return np.mean(self.posterior_probs[np.arange(self.labels.shape[0]),self.labels])
     
-    def get_Lscore(self):
+    def get_min_responsibility(self):
+        return np.min(self.posterior_probs[np.arange(self.labels.shape[0]),self.labels])
+    
+    def get_ll_responsibility(self):
+        return np.sum(np.log(self.posterior_probs[np.arange(self.labels.shape[0]),self.labels]))
+    
+    def get_min_AC_l_prob(self):
+        min_label = np.sorted([[np.sum(self.labels==l),l] for l in np.unique(self.labels)], key=lambda x: x[1] )[0][0]
+        w_min_label = np.where(labels == min_label)
+        return np.sum(self.lprobs[w_min_label])
+
+    def get_min_AC_mean_responsibility(self):
+        min_label = np.sorted([[np.sum(self.labels==l),l] for l in np.unique(self.labels)], key=lambda x: x[1] )[0][0]
+        w_min_label = np.where(labels == min_label)
+        resps = self.posterior_probs[np.arange(self.labels.shape[0]),self.labels][w_min_label]
+        return  np.mean(resps)
+    
+
+
+    def get_ll_probs(self):
         return np.sum(self.l_probs)  
+
+    def get_Lscore(self):
+        return self.get_ll_probs() 
         
     def correct_order_proportion(self):
         #wnd_proportion_dir

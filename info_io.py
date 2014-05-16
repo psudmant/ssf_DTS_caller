@@ -35,3 +35,6 @@ class info_io(object):
     def output_entry(self, entry):
         outstr = "\t".join(["{0}".format(entry[f]) for f in self.fields])
         self.FOUT.write("%s\n"%outstr)
+
+
+

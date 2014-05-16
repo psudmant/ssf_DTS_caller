@@ -768,8 +768,9 @@ class GMM_gt(object):
         min_z = self.get_min_z_dist()
         bic_delta = self.get_bic_delta() 
         Lscore = self.get_Lscore()
-        min_inter_label_dist = 0
-        singleton_P = 0
+
+        min_inter_label_dist = self.get_min_inter_label_dist()
+        singleton_P = self.get_singleton_P()
         
         entry = info_ob.init_entry()
 
@@ -794,6 +795,11 @@ class GMM_gt(object):
     """
     functions for getting different filtering info 
     """
+    def min_inter_label_dist(self):
+        ###
+
+    def singleton_P(self):
+        return 0
     
     def get_Lscore(self):
         return np.sum(self.l_probs)  
@@ -819,18 +825,9 @@ class GMM_gt(object):
             wl_0 = np.where(labels==l_0)
             wl_1 = np.where(labels==l_1)
             t+=self.X.shape[1]
-            """
-            COULD traverse in...
-            """
-            #print self.X.shape
-            #print self.X[wl_0,:]
-            #print self.X[wl_1,:]
-            #print wl_0[0].shape, wl_1[0].shape
-            #print np.amax(self.X[wl_0,:], 1), np.amin(self.X[wl_1,:], 1)
             s=np.sum(np.amax(self.X[wl_0,:], 1)<np.amin(self.X[wl_1,:], 1))
             s2=np.sum(np.median(self.X[wl_0,:], 1)<np.median(self.X[wl_1,:], 1))
             p+=s
-            #print "\t", mu_0, l_0, mu_1, l_1, s, self.X.shape[1], s/float(self.X.shape[1]),s2/float(self.X.shape[1])      
         
         return float(p)/t
     

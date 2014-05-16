@@ -5,21 +5,18 @@ class info_io(object):
     def __init__(self, FOUT):
         self.FOUT = FOUT
         self.fields = ['contig','start','end']
-        self.fields+= ["mu_mu_d", 
-                       "max_mu_d", 
-                       "min_mu_d", 
-                       "f_correct_direction",
-                       "min_z",
-                       "wnd_size", 
-                       "bic_delta",
-                       "n_clusts",
-                       "min_allele_count",
-                       "Lscore",
-                       "min_inter_label_dist",
-                       "singleton_P"]
+        self.header_init = False
     
+    def init_header(self, entry):
+        
+        for k,v in entry.iteritems():
+            if not k in self.fields:
+                fields.append(k)
+
         outstr =  "\t".join(self.fields)
         self.FOUT.write("%s\n"%outstr)
+
+        self.header_init = True
 
     def init_entry(self):
         new_entry = {}
@@ -33,6 +30,10 @@ class info_io(object):
             entry[k] = v
     
     def output_entry(self, entry):
+
+        if not self.header_init:
+            init_header(entry)
+        
         outstr = "\t".join(["{0}".format(entry[f]) for f in self.fields])
         self.FOUT.write("%s\n"%outstr)
 

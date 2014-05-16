@@ -11,7 +11,7 @@ class info_io(object):
         
         for k,v in entry.iteritems():
             if not k in self.fields:
-                fields.append(k)
+                self.fields.append(k)
 
         outstr =  "\t".join(self.fields)
         self.FOUT.write("%s\n"%outstr)
@@ -32,7 +32,7 @@ class info_io(object):
     def output_entry(self, entry):
 
         if not self.header_init:
-            init_header(entry)
+            self.init_header(entry)
         
         outstr = "\t".join(["{0}".format(entry[f]) for f in self.fields])
         self.FOUT.write("%s\n"%outstr)

@@ -37,6 +37,7 @@ from scipy.stats.mstats import mode
 import IPython
 import pdb
 
+import info_io
 
 class call:
 
@@ -755,42 +756,45 @@ class GMM_gt(object):
         #    return True
 
 
-    def output_filter_data(self, F_filt, contig, s, e):
+    def output_filter_data(self, info_ob, contig, s, e):
         
         if self.f_correct == None:
             self.f_correct = self.correct_order_proportion()
         
         mu_mu_d, min_mu_d, max_mu_d = self.get_mean_min_max_inter_mu_dist()
-
         n_clusts = self.n_clusts 
         min_AC = min(np.sum(self.labels==l) for l in np.unique(self.labels))
-
         n_wnds = self.n_wnds
         min_z = self.get_min_z_dist()
-        
         bic_delta = self.get_bic_delta() 
-        
         Lscore = self.get_Lscore()
+        min_inter_label_dist = 0
+        singleton_P = 0
+        
+        entry = info_ob.init_entry()
 
-        F_filt.write("%s\n"%s("\t".join(["{0}".format(v) for v in [contig, 
-                                                                   s, 
-                                                                   e,
-                                                                   mu_mu_d, 
-                                                                   max_mu_d, 
-                                                                   min_mu_d, 
-                                                                   self.f_correct,
-                                                                   min_z, 
-                                                                   n_wnds,
-                                                                   bic_delta,
-                                                                   n_clusts,
-                                                                   min_AC,
-                                                                   Lscore ]])))
-            
+        info_ob.update_entry(entry,"contig", contig)
+        info_ob.update_entry(entry,"start", s)
+        info_ob.update_entry(entry,"end", e)
+        info_ob.update_entry(entry,"mu_mu_d", mu_mu_d)
+        info_ob.update_entry(entry,"max_mu_d", max_mu_d)
+        info_ob.update_entry(entry,"min_mu_d", min_mu_d)
+        info_ob.update_entry(entry,"f_correct_direction", self.f_correct)
+        info_ob.update_entry(entry,"min_z", min_z)
+        info_ob.update_entry(entry,"wnd_size", n_wnds)
+        info_ob.update_entry(entry,"bic_delta", bic_delta)
+        info_ob.update_entry(entry,"n_clusts", n_clusts)
+        info_ob.update_entry(entry,"min_allele_count", min_AC)
+        info_ob.update_entry(entry,"Lscore", Lscore)
+        info_ob.update_entry(entry,"min_inter_label_dist",min_inter_label_dist)
+        info_ob.update_entry(entry,"singleton_P",singleton_P)
 
+        info_ob.output_entry(entry)
+        
     """
     functions for getting different filtering info 
     """
-
+    
     def get_Lscore(self):
         return np.sum(self.l_probs)  
         
@@ -1100,7 +1104,7 @@ def assess_GT_overlaps(gmm):
     return u_o, med_o, overlaps
     
         
-def output(g, contig, s, e, F_gt, F_call, F_filt, F_VCF, filt, include_indivs=None, plot=False, v=False):
+def output(g, contig, s, e, filt, include_indivs=None, plot=False, v=False):
 
     print "%s %d %d"%(contig, s, e)
     stdout.flush()
@@ -1119,8 +1123,7 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, F_VCF, filt, include_indivs=No
     if gX.n_clusts == 1 or gX.fail_filter(filt):
         return
 
-    F_call.write("%s\t%d\t%d\n"%(contig, s, e))
-    g.output(F_gt, F_VCF, F_filt, gX, contig, s, e, v=v)
+    g.output(gX, contig, s, e, v=v)
 
     
      
@@ -1131,29 +1134,23 @@ def output(g, contig, s, e, F_gt, F_call, F_filt, F_VCF, filt, include_indivs=No
         g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, overlaps, fn="./plotting/test/%s_%d_%d.png"%(contig, s, e))
 
 
-class genotyper:
+class genotyper(object):
     
-    def setup_output(self, FOUT, FFILT, F_VCF):
+    def setup_output(self, F_GT, F_VCF, F_CALL, info_ob):
+
+        self.F_GT = F_GT
+        self.F_VCF = F_VCF
+        self.F_CALL = F_CALL
+        self.info_ob = info_ob
+
         outstr = "contig\tstart\tend\t%s\n"%("\t".join(self.indivs))
-        FOUT.write(outstr)
+        self.F_GT.write(outstr)
         
         VCF_outstr = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s\n"%("\t".join(self.indivs))
-        F_VCF.write(VCF_outstr)
+        self.F_VCF.write(VCF_outstr)
         
-        FFILT.write("{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\t{8}\t{9}\t{10}\t{11}\n".format("chr", 
-                                                                 "start", 
-                                                                 "end", 
-                                                                 "mu_mu_d", 
-                                                                 "max_mu_d", 
-                                                                 "min_mu_d", 
-                                                                 "f_correct_direction",
-                                                                 "min_z",
-                                                                 "wnd_size", 
-                                                                 "bic_delta",
-                                                                 "n_clusts",
-                                                                 "min_allele_count"))
 
-    def output(self, FOUT, F_VCF, F_filt, gX, contig, s, e, v=False):
+    def output(self, gX, contig, s, e, v=False):
         
         outstr = "%s\t%d\t%d"%(contig, s, e)
         gts_by_indiv, gts_to_label, labels_to_gt = gX.get_gts_by_indiv()
@@ -1162,7 +1159,7 @@ class genotyper:
         cn_range=range(0,max(cns)+1)
         
         gt_lls_by_indiv = gX.get_gt_lls_by_indiv(labels_to_gt)
-        gX.output_filter_data(F_filt, contig, s, e)
+        gX.output_filter_data(self.info_ob, contig, s, e)
         
         #reference hap_cn is already 1
         hap_cns = [1]
@@ -1265,12 +1262,12 @@ class genotyper:
                         
                 sGLs = ",".join(["%.2f"%l for l in GLs])
                 sPLs = ",".join(["%d"%l for l in PLs])
-                s="{GT}:{COPY}:{GLs}:{PLs}:{CNL}".format(GT=GT,
-                                                         COPY=COPY,
-                                                         GLs = sGLs,
-                                                         PLs=sPLs,
-                                                         CNL=s_CNL)
-                V_data.append(s)
+                strout="{GT}:{COPY}:{GLs}:{PLs}:{CNL}".format(GT=GT,
+                                                              COPY=COPY,
+                                                              GLs = sGLs,
+                                                              PLs=sPLs,
+                                                              CNL=s_CNL)
+                V_data.append(strout)
             else:
                 ordered_cps.append(-1)
                 V_data.append("./.:0:0:0")
@@ -1278,8 +1275,9 @@ class genotyper:
         outstr = "%s\t%s\n"%(outstr, "\t".join("%d"%gt for gt in ordered_cps))
         V_outstr  = "%s\t%s\n"%(V_outstr, "\t".join(V_data))
         
-        FOUT.write(outstr)
-        F_VCF.write(V_outstr)
+        self.F_GT.write(outstr)
+        self.F_VCF.write(V_outstr)
+        self.F_CALL.write("%s\t%d\t%d\n"%(contig, s, e))
         
         if v:
             print V_outstr

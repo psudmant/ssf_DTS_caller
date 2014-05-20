@@ -14,6 +14,7 @@ from get_windowed_variance import get_windowed_variance
 import genotyper as gt
 import IPython
 import info_io
+import pdb
 
 def get_min_max(cc):
     mn = 9e9
@@ -153,6 +154,7 @@ if __name__=='__main__':
                 gt.output(g, contig, start, end, filt, plot=do_plot,v=verbose)  
         else:
             s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=do_plot)
+
             
             if len(s_e_segs)<=1 or non_adj:
                 for s_e in s_e_segs:

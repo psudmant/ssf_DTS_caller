@@ -428,6 +428,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
             s_e_segs.append(cnv_seg) 
             indivs_to_assess.append(list(assess_indivs))
         
+        #if gX.fail_filter(filt):
         return s_e_segs, indivs_to_assess, False
    
 def filter_invariant_segs(s_e_segs, g, contig):
@@ -756,8 +757,8 @@ class GMM_gt(object):
         #    return True
 
 
-    def output_filter_data(self, info_ob, contig, s, e):
-        
+    def output_filter_data(self, g, info_ob, contig, s, e, labels_to_gt, gts_by_indiv):
+
         if self.f_correct == None:
             self.f_correct = self.correct_order_proportion()
         
@@ -777,9 +778,38 @@ class GMM_gt(object):
         min_responsibility = self.get_min_responsibility()
         ll_responsibility = self.get_ll_responsibility()
         
-        min_AC_label = sorted([[np.sum(self.labels==l),l] for l in np.unique(self.labels)], key=lambda x: x[0] )[0][1]
+        labels_sorted_by_AC = sorted([[np.sum(self.labels==l),l] for l in np.unique(self.labels)], key=lambda x: x[0] )
+        min_AC_label = labels_sorted_by_AC[0][1]
+        max_AC_label = labels_sorted_by_AC[-1][1]
         min_AC_mean_responsibility = self.get_mean_responsibility_by_label(min_AC_label)
         min_AC_l_prob = self.get_l_prob_by_label(min_AC_label)
+        is_singleton = (min_AC==1 and n_clusts==2)
+        
+        is_dup_singleton = is_singleton and labels_to_gt[min_AC_label]>labels_to_gt[max_AC_label] 
+        is_del_singleton = is_singleton and labels_to_gt[min_AC_label]<labels_to_gt[max_AC_label]
+        
+        singleton_id = "None"
+        if is_singleton:
+            indiv_by_gt = {v:k for k, v in gts_by_indiv.iteritems()}
+            gt = labels_to_gt[min_AC_label]
+            indiv = indiv_by_gt[gt]
+            singleton_id = indiv
+            singleton_cp_z, singleton_logR_z = self.get_singleton_cp_z(g, contig, s, e, indiv)
+        else:
+            singleton_cp_z, singleton_logR_z = -1,-1
+        
+        all_gts = set(np.unique(np.array(labels_to_gt.values())))
+        
+        is_biallelic_del = False
+        is_biallelic_dup = False
+
+        if (all_gts == set([0,1,2])) or (all_gts == set([1,2])) or (all_gts == set([0,2])):
+            is_biallelic_del = True
+
+        if (all_gts == set([1,2,3])) or (all_gts == set([2,3])) or (all_gts == set([2,3,4])):
+            is_biallelic_dup = True
+        
+        Tstring, Fstring = "TRUE", "FALSE"
         entry = info_ob.init_entry()
         info_ob.update_entry(entry,"contig", contig)
         info_ob.update_entry(entry,"start", s)
@@ -798,7 +828,14 @@ class GMM_gt(object):
         info_ob.update_entry(entry,"mean_responsibility", mean_responsibility)
         info_ob.update_entry(entry,"min_responsibility", min_responsibility)
         info_ob.update_entry(entry,"ll_responsibility", ll_responsibility)
-        info_ob.update_entry(entry,"is_singleton",(min_AC==1 and n_clusts==2) and 1 or 0)
+        info_ob.update_entry(entry,"singleton_cp_z", singleton_cp_z)
+        info_ob.update_entry(entry,"singleton_logR_z", singleton_logR_z)
+        info_ob.update_entry(entry,"is_singleton",is_singleton and Tstring or Fstring)
+        info_ob.update_entry(entry,"is_dup_singleton",is_dup_singleton and Tstring or Fstring)
+        info_ob.update_entry(entry,"is_del_singleton",is_del_singleton and Tstring or Fstring)
+        info_ob.update_entry(entry,"singleton_id",singleton_id)
+        info_ob.update_entry(entry,"is_biallelic_dup",is_biallelic_dup and Tstring or Fstring)
+        info_ob.update_entry(entry,"is_biallelic_del",is_biallelic_del and Tstring or Fstring)
         info_ob.update_entry(entry,"min_AC_mean_responsibility", min_AC_mean_responsibility)
         info_ob.update_entry(entry,"min_AC_lprob",min_AC_l_prob)
         info_ob.output_entry(entry)
@@ -806,6 +843,43 @@ class GMM_gt(object):
     """
     functions for getting different filtering info 
     """
+
+    def get_singleton_cp_z(self, g, contig, s, e, indiv):
+        
+        n = 10
+        pad = 3 
+        
+        i = g.indivs.index(indiv)
+        X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
+        idx_d = (idx_e - idx_s)
+        
+        idx_s_l, idx_e_l = max(0, idx_s-n*idx_d-pad), idx_s-pad
+        idx_s_r, idx_e_r = idx_e+pad, min(idx_e+n*idx_d+pad, g.wnd_ends.shape[0])
+        
+        Xl = g.get_gt_matrix_by_idx(contig, idx_s_l, idx_e_l)
+        Xr = g.get_gt_matrix_by_idx(contig, idx_s_r, idx_e_r)
+
+        cps = np.r_[Xl[i,:], Xr[i,:]]
+        csum = np.cumsum(cps)
+        conv= (np.r_[csum[idx_d-1], csum[idx_d:]-csum[:-idx_d]])/float(idx_d)
+
+        v = np.var(conv)
+        mu = np.mean(conv)
+        z = np.absolute((np.mean(X[i,:])-mu)/(v**.5))
+        
+        ind_ids = np.r_[np.arange(i),np.arange(i+1,X.shape[0])]
+        all_cps = np.c_[Xl[ind_ids,:], Xr[ind_ids,:]]
+        logR = np.log(cps/all_cps)/np.log(2.0)
+        csum_logR = np.cumsum(logR,1)
+        conv_logR= (np.c_[csum_logR[:,idx_d-1], csum_logR[:,idx_d:]-csum_logR[:,:-idx_d]])/float(idx_d)
+
+        v_R = np.var(conv_logR)
+        mu_R = np.mean(conv_logR)
+        t_L = np.mean(np.log(X[i,:]/X[ind_ids,:])/np.log(2.0))
+        z_R = np.absolute((t_L-mu_R)/(v_R**.5))
+
+        return z, z_R
+
     def get_min_inter_label_dist(self):
         ###
         args = np.argsort(self.mus)
@@ -1138,6 +1212,8 @@ def assess_GT_overlaps(gmm):
         overlaps.append({"us":tuple([u_1,u_2]),"os":tuple([o1, o2]),"ss":tuple([s1,s2]), "ws":tuple([w1,w2]), "sdist":tuple(s_dist)})
     
     u_o, med_o = np.mean(all_os), np.median(all_os)
+    if len(overlaps) == 0:
+        overlaps = None
     return u_o, med_o, overlaps
     
         
@@ -1196,7 +1272,7 @@ class genotyper(object):
         cn_range=range(0,max(cns)+1)
         
         gt_lls_by_indiv = gX.get_gt_lls_by_indiv(labels_to_gt)
-        gX.output_filter_data(self.info_ob, contig, s, e)
+        gX.output_filter_data(self, self.info_ob, contig, s, e, labels_to_gt, gts_by_indiv)
         
         #reference hap_cn is already 1
         hap_cns = [1]
@@ -1526,6 +1602,11 @@ class genotyper(object):
         X = self.cp_matrix[:,start_idx:end_idx]
          
         return X, start_idx, end_idx
+    
+    def get_gt_matrix_by_idx(self, contig, start_idx, end_idx):
+        assert contig == self.contig
+        X = self.cp_matrix[:,start_idx:end_idx]
+        return X
     
     def get_sunk_gt_matrix(self, contig, start, end, vb=False):
         assert contig == self.contig

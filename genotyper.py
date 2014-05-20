@@ -414,23 +414,49 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
             m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test", g, indivs_by_cnv_segs, [], CNV_segs, cnv_segs_by_indiv)
         
         #m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
-        s_e_segs = []
-        indivs_to_assess = []
         
-        for cnv_seg, inds_called in indivs_by_cnv_segs.iteritems():
-            assess_indivs = Set(g.indivs)   
-            s1, e1 = cnv_seg
-            for cnv_seg2, indivs2 in indivs_by_cnv_segs.iteritems():
-                s2, e2 = cnv_seg2
-                if cnv_seg != cnv_seg2 and overlap(s1, e1, s2, e2):
-                    assess_indivs = assess_indivs - Set(indivs2)
-            
-            s_e_segs.append(cnv_seg) 
-            indivs_to_assess.append(list(assess_indivs))
+        """
+        get the individuals to assess in overlapping chunks
+        """
+        s_e_segs, indivs_to_assess = get_indivs_in_overlapping_segs(indivs_by_cnv_segs, g)
+
+        """
+        HOWEVER, now, get the genotypes for each call, and EXCLUDE those that are filtered
+        """
+        passing_indivs_by_cnv_segs = {}
+
+        for i, s_e_seg in enumerate(s_e_segs):
+            include_indivs = indivs_to_assess[i]
+            s, e = s_e_seg
+            X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
+            gX = g.GMM_genotype(X, include_indivs = include_indivs)
+            if not gX.fail_filter(filt):
+                passing_indivs_by_cnv_segs[s_e_seg] = indivs_by_cnv_segs[s_e_seg]
+
+        s_e_segs, indivs_to_asses = get_indivs_in_overlapping_segs(passing_indivs_by_cnv_segs, g)
         
-        #if gX.fail_filter(filt):
         return s_e_segs, indivs_to_assess, False
-   
+  
+def get_indivs_in_overlapping_segs(indivs_by_cnv_segs, g):
+    """
+    n^2 operation to determine the indivs in each call
+    """
+    s_e_segs = []
+    indivs_to_assess = []
+    
+    for cnv_seg, inds_called in indivs_by_cnv_segs.iteritems():
+        assess_indivs = Set(g.indivs)   
+        s1, e1 = cnv_seg
+        for cnv_seg2, indivs2 in indivs_by_cnv_segs.iteritems():
+            s2, e2 = cnv_seg2
+            if cnv_seg != cnv_seg2 and overlap(s1, e1, s2, e2):
+                assess_indivs = assess_indivs - Set(indivs2)
+        
+        s_e_segs.append(cnv_seg) 
+        indivs_to_assess.append(list(assess_indivs))
+
+    return s_e_segs, indivs_to_assess
+
 def filter_invariant_segs(s_e_segs, g, contig):
 
     """

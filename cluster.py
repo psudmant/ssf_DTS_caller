@@ -1069,6 +1069,10 @@ class cluster_callsets(object):
         axes[1,0].set_xlim([min_start, max_end])
         axes[1,0].set_ylim([0, y2-.2])
         axes[0,1].set_xlim([min_start, max_end])
+        
+        ylims = axes[1,1].get_ylim()
+        axes[1,1].set_ylim([ylims[0]-1, ylims[1]+1])
+
         axes[1,1].set_xlim([min_start, max_end])
         plt.savefig("%s/%d_%d_bps.pdf"%(out_dir, min_start, max_end))
         plt.gcf().clear()

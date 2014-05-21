@@ -490,7 +490,12 @@ def filter_invariant_segs(s_e_segs, g, contig):
 
     
 def overlap(s1, e1, s2, e2):
-    if (s1<=e2 and s2<=e1):
+    """
+        if one starts wheere the other ends, they don't overlap 
+    """
+    if s1==e2 or s2 == e1:
+        return False
+    elif (s1<=e2 and s2<=e1):
         return True
     return False
 

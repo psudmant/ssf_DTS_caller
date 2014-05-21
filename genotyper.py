@@ -423,17 +423,19 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
         """
         HOWEVER, now, get the genotypes for each call, and EXCLUDE those that are filtered
         """
+        #somewheres here... there's filtering going on... the wrong indivs are getting in...? 
+        
         passing_indivs_by_cnv_segs = {}
-
         for i, s_e_seg in enumerate(s_e_segs):
-            include_indivs = indivs_to_assess[i]
+            include_indivs = list(indivs_to_assess[i])
             s, e = s_e_seg
-            X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
-            gX = g.GMM_genotype(X, include_indivs = include_indivs)
-            if not gX.fail_filter(filt):
-                passing_indivs_by_cnv_segs[s_e_seg] = indivs_by_cnv_segs[s_e_seg]
+            if len(include_indivs) > 1:
+                X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
+                gX = g.GMM_genotype(X, include_indivs = include_indivs)
+                if not gX.fail_filter(filt):
+                    passing_indivs_by_cnv_segs[s_e_seg] = indivs_by_cnv_segs[s_e_seg]
 
-        s_e_segs, indivs_to_asses = get_indivs_in_overlapping_segs(passing_indivs_by_cnv_segs, g)
+        s_e_segs, indivs_to_assess = get_indivs_in_overlapping_segs(passing_indivs_by_cnv_segs, g)
         
         return s_e_segs, indivs_to_assess, False
   
@@ -643,7 +645,7 @@ class GMM_gt(object):
         self.min_bic = min(self.bics)
         self.weights = self.gmm.weights
         
-        self.indivs = indivs 
+        self.indivs = list(indivs)
         self.n_clusts = np.unique(self.labels).shape[0]
         
         self.n_wnds = self.X.shape[1]
@@ -1258,7 +1260,7 @@ def output(g, contig, s, e, filt, include_indivs=None, plot=False, v=False):
         print "***********FAILED************"
     if gX.n_clusts ==1:  
         print "***********1_CLUST************"
-
+    
     if gX.n_clusts == 1 or gX.fail_filter(filt):
         return
 
@@ -1715,7 +1717,6 @@ class genotyper(object):
                 new_X[i] = X[j] 
                 
             X=new_X
-       
         mus = np.mean(X,1)
         mus = np.reshape(mus, (mus.shape[0],1))
         dist_mat = dist.pdist(mus)
@@ -1760,7 +1761,7 @@ class genotyper(object):
             gmm, labels = self.final_call_merge(gmm, labels, mus) 
 
         if include_indivs == None: 
-            include_indivs = self.indivs
+            include_indivs = list(self.indivs)
         
         if overload_indivs != None:
             return GMM_gt(X, gmm, labels, Z, params, bics, overload_indivs)

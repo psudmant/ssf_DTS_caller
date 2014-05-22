@@ -226,6 +226,9 @@ def get_segs_from_clustered_indivs(indivs_by_grp, segs_by_grp, indivs_by_cnv_seg
     return indivs_by_segs
 
 def cluster_indivs(cnv_segs_by_indiv, g, cutoff=0.85, max_frac_uniq=0.1):
+    """
+    cluster individuals based on their shared segments
+    """
     
     l = len(g.indivs)
     mat = np.zeros([l,l])
@@ -354,14 +357,17 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
     #THIS IS EATING UP TIME
     CNV_segs, CNV_gXs = filter_invariant_segs(s_e_segs, g, contig) 
     print "got var chunks in %fs"%(time.time()-t)
-    
     if len(CNV_segs) <= 1 or non_adjacent(CNV_segs):
         indivs_to_assess = [None for i in s_e_segs]
         exclude_loci = [None for i in s_e_segs]
         return CNV_segs, indivs_to_assess, True
     
     else:
-
+        """
+        for each individual get a list of all the segments that vary and key those segments 
+        off of both the individual and the segment
+        note that abutting segments get grouped
+        """
         cnv_segs_by_indiv = {}
         for i, indiv in enumerate(g.indivs):
             indiv_cnv_segs = []
@@ -382,6 +388,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
                     indivs_by_cnv_segs[s_e_tup] = []
                 indivs_by_cnv_segs[s_e_tup].append(indiv)
         
+        original_indivs_by_cnv_segs = {tuple(k):list(v) for k,v in indivs_by_cnv_segs.iteritems()}
         """
         if high copy, then force more clustering
 
@@ -391,7 +398,6 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
         the fraction of below which if two individuals are different we just group them together
         this has to happen for high copy regions because they are so nasty
         """
-        
         max_uniq_thresh=0.3
         max_frac_uniq=.1
 
@@ -405,8 +411,33 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
         indivs_by_grp, segs_by_grp = cluster_indivs(cnv_segs_by_indiv,g, 0.85, max_frac_uniq=max_frac_uniq) 
         indivs_by_cnv_segs = get_segs_from_clustered_indivs(indivs_by_grp, segs_by_grp, indivs_by_cnv_segs, g)
         
-        #finally cluster these
+        """
+        FINALLY, go through the original indivs_by_cnv_segs and if there are any bits, add those to the assesment too
+        why? well, if you had something like this
+           --- 
+           ++++++
+           ++++++
+           ---
+           ++++++
+           ++++++ __
+         
+           where one indiv has a bit extra, well then we'll want to have it as a call too
 
+           !!!! doesn't actually work for abutting, just works for space
+        """
+        to_add = {}
+        for cnv_seg, indivs in original_indivs_by_cnv_segs.iteritems():
+            s1, e1 = cnv_seg
+            for c_cnv_seg, c_indivs in indivs_by_cnv_segs.iteritems():
+                s2, e2 = c_cnv_seg
+                if overlap(s1, e1, s2, e2): break
+            else:
+                to_add[cnv_seg] = indivs
+        
+        for k, v in to_add.iteritems():
+            indivs_by_cnv_segs[k] = v
+
+        #finally cluster these
         if len(indivs_by_cnv_segs.keys())>1:
             indivs_by_cnv_segs = cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, max_uniq_thresh)
         
@@ -415,6 +446,9 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
         
         #m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
         
+        
+
+
         """
         get the individuals to assess in overlapping chunks
         """
@@ -423,8 +457,6 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
         """
         HOWEVER, now, get the genotypes for each call, and EXCLUDE those that are filtered
         """
-        #somewheres here... there's filtering going on... the wrong indivs are getting in...? 
-        
         passing_indivs_by_cnv_segs = {}
         for i, s_e_seg in enumerate(s_e_segs):
             include_indivs = list(indivs_to_assess[i])
@@ -491,7 +523,7 @@ def filter_invariant_segs(s_e_segs, g, contig):
     
 def overlap(s1, e1, s2, e2):
     """
-        if one starts wheere the other ends, they don't overlap 
+    if one starts wheere the other ends, they don't overlap 
     """
     if s1==e2 or s2 == e1:
         return False
@@ -1681,7 +1713,7 @@ class genotyper(object):
         
         #covars = np.array([v[0][0] for v in gmm.covars])
         #covars = np.array([np.reshape(np.array([max(v, min_covar)]),(1,1)) for v in init_vars])
-        covars = np.array([max(v, min_covar)for v in init_vars])
+        covars = np.array([max(v, min_covar) for v in init_vars])
         gmm.covars = covars
         
         #gmm.fit(X, n_iter=n_iter, init_params='c')
@@ -1758,12 +1790,13 @@ class genotyper(object):
         #idx = np.where(np.array(params)==3)[0][0]
         gmm = gmms[idx]
         labels = all_labels[idx]
+        bic = bics[idx]
         
 
         ####NOW, finally merge calls that are too close 
         n_labels = np.unique(labels).shape[0] 
         if n_labels>1:
-            gmm, labels = self.final_call_merge(gmm, labels, mus) 
+            gmm, labels = self.final_call_merge(gmm, bic, labels, mus) 
 
         if include_indivs == None: 
             include_indivs = list(self.indivs)
@@ -1773,7 +1806,7 @@ class genotyper(object):
         else:
             return GMM_gt(X, gmm, labels, Z, params, bics, include_indivs)
 
-    def final_call_merge(self, gmm, labels,mus, max_overlap=0.5, min_dist=0.6):
+    def final_call_merge(self, gmm, original_ic, labels,mus, max_overlap=0.5, min_dist=0.6):
         """
         take the final min_bic call and merge calls that are too close   
         """
@@ -1782,6 +1815,8 @@ class genotyper(object):
         u_o, med_o, overlaps = assess_GT_overlaps(gmm)
         max_overlap_stat = sorted(overlaps, key = lambda x: max(x['os']))[-1]
         n_labels = np.unique(labels).shape[0] 
+        
+        ic = original_ic
         while (max(max_overlap_stat['os']) > max_overlap) and n_labels>1:
             u1, u2 = max_overlap_stat['us'] 
             l1, l2 = np.where(gmm.means==u1)[0][0], np.where(gmm.means==u2)[0][0]
@@ -1806,6 +1841,8 @@ class genotyper(object):
         #note, this is the min_sd of the max_overlap... 
         #maybe this is always the min_sd? but, perhaps not??
         sd = min(max_overlap_stat['sdist'])
+        
+        curr_ic = ic
 
         while (d < min_dist ) and n_labels>1:
             u1, u2 = max_overlap_stat['us'] 
@@ -1813,7 +1850,13 @@ class genotyper(object):
             labels[labels==l2] = l1
             
             init_mus, init_vars, init_weights = self.initialize(mus, labels) 
-            gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=1000)
+            t_gmm, t_labels, t_ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=1000)
+            
+            if t_ic<curr_ic:
+                curr_ic = t_ic
+                gmm, labels = t_gmm, t_labels
+            else:
+                break
 
             u_o, med_o, overlaps = assess_GT_overlaps(gmm)
             n_labels = np.unique(labels).shape[0] 

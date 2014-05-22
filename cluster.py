@@ -995,6 +995,15 @@ class cluster_callsets(object):
     
     @classmethod
     def plot(cls, overlapping_call_clusts, out_dir, g, indivs_by_seg, s_es, CNV_s_e, cnv_segs_by_indiv):
+
+
+        """
+        row col
+        0, 0 are the individual calls, clustered together
+        1, 0 are the median s e of the calls AND the chopped up bits of those
+        0, 1 is takign all the the CNV segs and clustering them by indiv
+        1, 1 is taking those clustered individuals and the outputting the blocks
+        """
          
         min_start = 9e9
         max_end = -1

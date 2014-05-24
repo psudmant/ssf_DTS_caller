@@ -694,8 +694,7 @@ class GMM_gt(object):
         
         #only in sklearn 0.14.1
         #self.score_samples = gmm.score_samples(X)
-
-
+        
         #unique labels are the unique labels and uniq mus are the 
         #mean of the self.mus for each label
         
@@ -1531,7 +1530,8 @@ class genotyper(object):
         l = gmm.means.shape[0]
         u_labels = np.unique(labels)
         print u_labels
-
+        
+        all_mus = []
         for i in xrange(l):
             #if not i in u_labels: continue
             c = cm.hsv(float(i)/l,1)
@@ -1539,11 +1539,17 @@ class genotyper(object):
             var = gmm.covars[i][0][0]
 
             print mu, var, var**.5
-            
+            all_mus.append(mu)
+
             G_y = mlab.normpdf(G_x, mu, var**.5)*gmm.weights[i]
             ax.plot(G_x,G_y,color=c)
             ax.plot(mu,-.001,"^",ms=10,alpha=.7,color=c)
         
+        if len(all_mus) >1:
+            min_mu_d = np.amin(np.diff(np.array(sorted(all_mus))))
+        else:
+            min_mu_d = 0
+
         if overlaps!=None:
             ymax=ax.get_ylim()[1]
             y=ymax-.2
@@ -1569,7 +1575,7 @@ class genotyper(object):
                 ax.text(x,y,"%.2f %.2f %.2f %.2f %.2f"%(o1, ds1, us[0], ss[0], ws[0] ), fontsize=6, horizontalalignment='center', verticalalignment='center')
                 ax.text(x,y-.15,"%.2f %.2f %.2f %.2f %.2f"%(o2, ds2, us[1], ss[1], ws[1] ), fontsize=6, verticalalignment='center', horizontalalignment='center')
              
-            ax.text(xmin+1,ymax-.2,"%.2f %.2f"%(np.mean(all_os), np.max(all_os)), fontsize=8, verticalalignment='center', horizontalalignment='right')
+            ax.text(xmin+1,ymax-.2,"%.2f %.2f"%(min_mu_d, np.max(all_os)), fontsize=8, verticalalignment='center', horizontalalignment='right')
             
     def aug_dendrogram(self, ax, ddata):
         for i, d in zip(ddata['icoord'], ddata['dcoord']):
@@ -1806,7 +1812,7 @@ class genotyper(object):
         else:
             return GMM_gt(X, gmm, labels, Z, params, bics, include_indivs)
 
-    def final_call_merge(self, gmm, original_ic, labels,mus, max_overlap=0.5, min_dist=0.6):
+    def final_call_merge(self, gmm, original_ic, labels,mus, max_overlap=0.5, min_dist=0.55):
         """
         take the final min_bic call and merge calls that are too close   
         """
@@ -1850,13 +1856,13 @@ class genotyper(object):
             labels[labels==l2] = l1
             
             init_mus, init_vars, init_weights = self.initialize(mus, labels) 
-            t_gmm, t_labels, t_ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=1000)
+            gmm, labels, ic = self.fit_GMM(mus, init_mus, init_vars, init_weights, n_iter=1000)
             
-            if t_ic<curr_ic:
-                curr_ic = t_ic
-                gmm, labels = t_gmm, t_labels
-            else:
-                break
+            #if t_ic<curr_ic:
+            #    curr_ic = t_ic
+            #    gmm, labels = t_gmm, t_labels
+            #else:
+            #    break
 
             u_o, med_o, overlaps = assess_GT_overlaps(gmm)
             n_labels = np.unique(labels).shape[0] 

@@ -31,7 +31,30 @@ def genotype(cps, wnd_starts, wnd_ends, contig, start, end):
     cps = np.mean(cps[:, wnd_start:wnd_end+1],1) 
     return cps
 
+def weighted_genotype(cps, wnd_starts, wnd_ends, contig, start, end):
+    """
+    Get weighted mean copy numbers for windows that overlap a given region.
+    """
 
+    l = cps.shape[1]
+    wnd_start = np.searchsorted(wnd_ends[0], start)
+    wnd_end = np.searchsorted(wnd_starts[0], end) - 1
+    if wnd_start >= l: #Catch if no window overlaps region
+        return None
+    if wnd_start == wnd_end: #Don't calculate weights if only 1 window overlaps region
+        cp_weights = np.array([1])
+    else:
+    # Calculate % overlap for start and end windows
+        start_weight = (max(start, min(end, wnd_ends[0][wnd_start])) \
+                      - max(start, wnd_starts[0][wnd_start]))        \
+                      / float(wnd_ends[0][wnd_start]-wnd_starts[0][wnd_start])
+        end_weight = (min(end, wnd_ends[0][wnd_end]) \
+                    - min(end, max(start, wnd_starts[0][wnd_end])))        \
+                    / float(wnd_ends[0][wnd_end]-wnd_starts[0][wnd_end])
+        cp_weights = np.array([start_weight] + [1 for x in xrange(wnd_start + 1, wnd_end)] +
+                              [end_weight])
+    copies = np.average(cps.ix[:, wnd_start:wnd_end], axis = 1, weights = cp_weights)
+    return copies
 
 if __name__=="__main__":
          

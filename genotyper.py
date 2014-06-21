@@ -1466,7 +1466,7 @@ class genotyper(object):
              
     def init_on_indiv_DTS_files(self, **kwargs):
 
-        g = gglob.init_from_DTS(**kwags)
+        g = gglob.init_from_DTS(**kwargs)
 
         self.indivs = g.indivs
         self.wnd_starts = g.wnd_starts
@@ -1514,7 +1514,8 @@ class genotyper(object):
         if self.gglob_dir:
             self.init_on_gglob(self.gglob_dir, self.contig, subset_indivs) 
         else:
-            self.init_on_indiv_DTS_files(self, **kwargs)
+            kwargs['contig'] = contig
+            self.init_on_indiv_DTS_files(**kwargs)
     
         k = self.cp_matrix.shape[0]
         print >>stderr, "loading %d genomes..."%(k)

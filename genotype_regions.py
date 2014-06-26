@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Get copy number from each DenseTrackSet for each region in the given file.
+Get copy number from each DenseTrackSet or gglob for each region in the given file.
 """
 import argparse
 from collections import OrderedDict

@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/usr/bin/env python
 """
 Get copy number from each DenseTrackSet for each region in the given file.
 """

@@ -36,6 +36,7 @@ from scipy.stats.mstats import mode
 
 import IPython
 import pdb
+import pysam
 
 import info_io
 
@@ -464,7 +465,16 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
             if len(include_indivs) > 1:
                 X, idx_s, idx_e = g.get_gt_matrix(contig, s, e)
                 gX = g.GMM_genotype(X, include_indivs = include_indivs)
+                
+                mus = np.mean(X,1)
+                if g.is_segdup(contig, s, e) or np.mean(mus)>=3:
+                    Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
+                    gXs = g.GMM_genotype(Xs)
+                    if gXs.n_clusts == 1:
+                        continue
+
                 if not gX.fail_filter(filt):
+    
                     passing_indivs_by_cnv_segs[s_e_seg] = indivs_by_cnv_segs[s_e_seg]
 
         s_e_segs, indivs_to_assess = get_indivs_in_overlapping_segs(passing_indivs_by_cnv_segs, g)
@@ -1297,6 +1307,15 @@ def output(g, contig, s, e, filt, include_indivs=None, plot=False, v=False):
     if gX.n_clusts ==1:  
         print "***********1_CLUST************"
     
+    mus = np.mean(X,1)
+
+    if g.is_segdup(contig, s, e) or np.mean(mus)>=3:
+        Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
+        gXs = g.GMM_genotype(Xs)
+        if gXs.n_clusts == 1:
+            print "***********1_SD_CLUST************"
+            return
+            
     if gX.n_clusts == 1 or gX.fail_filter(filt):
         return
 
@@ -1313,15 +1332,17 @@ def output(g, contig, s, e, filt, include_indivs=None, plot=False, v=False):
 
 class genotyper(object):
     
-    def setup_output(self, F_GT, F_VCF, F_CALL, info_ob):
+    def setup_output(self, F_GT, F_SUNK_GT, F_VCF, F_CALL, info_ob):
 
         self.F_GT = F_GT
+        self.F_SUNK_GT = F_SUNK_GT
         self.F_VCF = F_VCF
         self.F_CALL = F_CALL
         self.info_ob = info_ob
 
         outstr = "contig\tstart\tend\t%s\n"%("\t".join(self.indivs))
         self.F_GT.write(outstr)
+        self.F_SUNK_GT.write(outstr)
         
         VCF_outstr = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t%s\n"%("\t".join(self.indivs))
         self.F_VCF.write(VCF_outstr)
@@ -1491,6 +1512,10 @@ class genotyper(object):
         self.cp_matrix = g.cp_matrix
         self.sunk_cp_matrix = g.sunk_cp_matrix
         
+    def is_segdup(self, contig, s, e):
+
+        overlapping_dups = [site for site in self.dup_tabix.fetch(contig, s, e, parser=pysam.asTuple())]
+        return len(overlapping_dups)>0
 
     def __init__(self, contig, **kwargs): 
 
@@ -1500,7 +1525,9 @@ class genotyper(object):
         subset_indivs  = kwargs.get("subset_indivs", None)
         fn_fasta  = kwargs.get("fn_fa", None)
         
-
+        dup_tabix  = kwargs.get("dup_tabix", None)
+        
+        self.dup_tabix = dup_tabix
         self.contig = contig
         self.indivs = []
         self.wnd_starts = None

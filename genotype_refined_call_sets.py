@@ -96,16 +96,19 @@ if __name__=='__main__':
 
     tbx_dups = pysam.Tabixfile(o.fn_dup_tabix)
     callset_clust = cluster.cluster_callsets(o.fn_call_table, contig)
-    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs, fn_fa=o.fn_fa)
+    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs, fn_fa=o.fn_fa, dup_tabix = tbx_dups)
+    
+    fn_sunk_gt_out = o.fn_gt_out.replace(".genotypes",".sunk_genotypes")
 
     F_gt = open(o.fn_gt_out,'w')
+    F_sunk_gt = open(fn_sunk_gt_out,'w')
     F_VCF = open(o.fn_vcf_out,'w')
     F_call = open(o.fn_call_out,'w')
     FINF = open("%s.info"%o.fn_call_out,'w')
     
     info_ob = info_io.info_io(FINF)
     
-    g.setup_output(F_gt, F_VCF, F_call, info_ob)
+    g.setup_output(F_gt, F_sunk_gt, F_VCF, F_call, info_ob)
     """
     iterate over lists of overlapping calls
     each element in the list is a recip overlap cluster

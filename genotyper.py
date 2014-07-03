@@ -467,7 +467,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
                 gX = g.GMM_genotype(X, include_indivs = include_indivs)
                 
                 mus = np.mean(X,1)
-                if g.is_segdup(contig, s, e) or np.mean(mus)>=3:
+                if g.is_segdup(contig, s, e) or np.mean(mus)>=3 or np.amax(mus) >2.5:
                     Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
                     gXs = g.GMM_genotype(Xs)
                     if gXs.n_clusts == 1:
@@ -1309,7 +1309,7 @@ def output(g, contig, s, e, filt, include_indivs=None, plot=False, v=False):
     
     mus = np.mean(X,1)
 
-    if g.is_segdup(contig, s, e) or np.mean(mus)>=3:
+    if g.is_segdup(contig, s, e) or np.mean(mus)>=3 or np.amax(mus) >2.5:
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
         gXs = g.GMM_genotype(Xs)
         if gXs.n_clusts == 1:

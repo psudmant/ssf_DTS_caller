@@ -128,6 +128,9 @@ class gglob:
             stderr.write("loading %s..."%k)
             stderr.flush()
             t=time.time()
+            if not os.path.exists("%s.%s.h5"%(fn_in,k)):
+                raise Exception("""path "%s.%s.h5" does not exist!"""%(fn_in,k))
+
             df = pd.read_hdf("%s.%s.h5"%(fn_in,k),k)
             mats_by_key[k] = df.as_matrix()
             stderr.write("done (%fs)\n"%(time.time()-t))

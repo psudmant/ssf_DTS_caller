@@ -127,6 +127,7 @@ def genotype_DTS_regions(dts_list_file, regions_file, contigs, window):
 
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--gglob_dir", help="directory of gglob files")
     parser.add_argument("--dts_list_file", help="list of paths to DTS files to genotype")

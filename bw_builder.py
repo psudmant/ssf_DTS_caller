@@ -49,7 +49,7 @@ class output:
                 print >>F, "\t".join([contig,str(start),str(end),indiv,"0","+","0","0",color_hash[cp]]) 
             
         hg19_contigs = "/net/eichler/vol7/home/psudmant/genomes/contigs/hg19_contigs.txt"
-        cmd = " ~/local_installations/ucscOLD/ucsc/bin/bedToBigBed %s %s %s"%(fn_tmp,hg19_contigs,fn_out)
+        cmd = "/net/eichler/vol7/home/psudmant/local_installations/ucscOLD/ucsc/bin/bedToBigBed %s %s %s"%(fn_tmp,hg19_contigs,fn_out)
         track_def = """track type=bigBed name="%s_%s" description="%s_%s" visibility=dense itemRgb="On" dataUrl=%s\n"""%(indiv, 
                                                                                                                          name, 
                                                                                                                          indiv,

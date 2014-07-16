@@ -38,13 +38,27 @@ class dCGH():
         assert np.sum(np.isinf(ratios))==0
         
         return ratios    
-        
+    
+    def get_cp_dup_loci(self, chr):       
+        return self.wnd_cp_test.get_cp_dup_loci(chr), self.wnd_cp_ref.get_cp_dup_loci(chr)
+
     def get_wnds_by_chr(self,chr):
         return self.wnd_cp_ref.get_wnds_by_chr(chr)
     
     def get_overlapping_wnds(self,chr,tbx):
         return self.wnd_cp_ref.get_overlapping_wnds(chr,tbx)
 
+def getNonZeroRanges( A, zeroDefVal=0 ):
+    """
+    get position of adjactent 1st in a vector 
+    """
+    dA=np.diff(A)
+    N=A.shape[0]
+    nzdA,=np.nonzero(dA)
+    liRangesAll=np.c_[ np.r_[0,nzdA+1],
+    np.r_[nzdA,N-1] +1]
+    iiR = A.take(liRangesAll[:,0]) != zeroDefVal
+    return liRangesAll[iiR,:]
 
 class wnd_cp_indiv:
     def __init__(self,fn_dts,fn_contigs,wnd_size):
@@ -69,6 +83,15 @@ class wnd_cp_indiv:
     def get_wnds_by_chr(self,chr):
         return self.starts[chr][:],self.ends[chr][:]
     
+
+    def get_cp_dup_loci(self, chr):
+        cps = self.get_cps_by_chr(chr)
+        dup_regions = cps>3.5
+        ret = getNonZeroRanges(dup_regions)
+        return ret
+        
+
+
     def get_overlapping_wnds(self,chr,tbx):
         wnd_starts, wnd_ends = self.get_wnds_by_chr(chr)
         bnds = np.array([ [int(l[1]),int(l[2])] 

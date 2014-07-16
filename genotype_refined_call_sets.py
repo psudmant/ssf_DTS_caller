@@ -15,6 +15,8 @@ import genotyper as gt
 import IPython
 import info_io
 import pdb
+from GC_data import GC_data
+
 
 def get_min_max(cc):
     mn = 9e9
@@ -44,7 +46,8 @@ if __name__=='__main__':
     opts.add_option('','--subset_indivs',dest='subset_indivs', default=None)
     
     opts.add_option('','--genome_fa',dest='fn_fa', default="/net/eichler/vol7/home/psudmant/genomes/fastas/hg19_1kg_phase2_reference/human_g1k_v37.fasta")
-    
+    opts.add_option('','--GC_DTS',dest='fn_GC_DTS', default="/net/eichler/vol7/home/psudmant/genomes/GC_tracks/windowed_DTS/HG19/500_bp_slide_GC")
+    opts.add_option('','--DTS_contigs',dest='fn_DTS_contigs', default="/net/eichler/vol7/home/psudmant/EEE_Lab/1000G/1000genomesScripts/windowed_analysis/DTS_window_analysis/windows/hg19_slide/500_bp_windows.pkl.contigs")
     opts.add_option('','--do_plot',dest='do_plot',action="store_true",default=False)
     
     opts.add_option('','--simplify_complex_eval',
@@ -79,11 +82,13 @@ if __name__=='__main__':
     
     (o, args) = opts.parse_args()
     
+
     subset_indivs = o.subset_indivs
     if subset_indivs!=None:
         subset_indivs = subset_indivs.split(":")
     
     contig = o.contig
+    GC_inf = GC_data(o.fn_GC_DTS, contig, o.fn_DTS_contigs)
     
     target_loci = None
     
@@ -96,7 +101,7 @@ if __name__=='__main__':
 
     tbx_dups = pysam.Tabixfile(o.fn_dup_tabix)
     callset_clust = cluster.cluster_callsets(o.fn_call_table, contig)
-    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs, fn_fa=o.fn_fa, dup_tabix = tbx_dups)
+    g = gt.genotyper(contig, gglob_dir=o.gglob_dir, plot_dir=o.out_viz_dir, subset_indivs = subset_indivs, fn_fa=o.fn_fa, dup_tabix = tbx_dups, GC_inf = GC_inf)
     
     fn_sunk_gt_out = o.fn_gt_out.replace(".genotypes",".sunk_genotypes")
 

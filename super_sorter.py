@@ -182,8 +182,8 @@ if __name__=="__main__":
     
     opts.add_option('','--outfile',dest='fn_out', default=None)
 
-    opts.add_option('','--test_all_gt',dest='t_all_gt', default=-1, type=float) 
-    opts.add_option('','--test_all_lt',dest='t_all_lt', default=-1, type=float) 
+    opts.add_option('','--test_all_gt',dest='t_all_gt',  default=False, action='store_true')
+    opts.add_option('','--test_all_lt',dest='t_all_lt',  default=False, action='store_true')
 
     opts.add_option('','--test_group1_dup',dest='t_g1_dup', default=False, action='store_true')
     opts.add_option('','--test_group1_del',dest='t_g1_del', default=False, action='store_true')
@@ -217,11 +217,11 @@ if __name__=="__main__":
         all_dup_out = bed_output("%s.all_dup.wssd.bed"%o.fn_out)
         all_sunk_dup_out = bed_output("%s.all_dup.sunk.bed"%o.fn_out)
     
-    if o.t_all_gt!=-1:
+    if o.t_all_gt:
         all_gt_out = bed_output("%s.all_gt.wssd.bed"%o.fn_out)
         all_sunk_gt_out = bed_output("%s.all_gt.sunk.bed"%o.fn_out)
     
-    if o.t_all_lt!=-1:
+    if o.t_all_lt:
         all_lt_out = bed_output("%s.all_lt.wssd.bed"%o.fn_out)
         all_sunk_lt_out = bed_output("%s.all_lt.sunk.bed"%o.fn_out)
 

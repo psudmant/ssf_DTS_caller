@@ -62,6 +62,8 @@ if __name__=="__main__":
     opts.add_option('', '--contigs', dest='fn_contigs', default=None)
     opts.add_option('', '--window_size', dest='window_size', type=int, default=None)
     opts.add_option('', '--min_ref_cp_delta', dest='min_d', type=float, default=0)
+    
+    opts.add_option('', '--no_P_value_adjust', dest='P_adjust', action='store_false',  default=True)
 
     """
         min_delta - the min mean cp distance between an individual and the refs it was called against 
@@ -102,7 +104,7 @@ if __name__=="__main__":
         call_table.filter_by_chr(o.limit_to_chr)
     
     call_table.filter_by_gsize(o.max_callsize)
-    call_table.filter(o.p_cutoff, o.min_wnds, o.single_window_cutoff, divide_by_mu=True) 
+    call_table.filter(o.p_cutoff, o.min_wnds, o.single_window_cutoff, divide_by_mu=o.P_adjust) 
     call_table.output(o.fn_out_indiv_calls_bed)
     
     tbx_dups = pysam.Tabixfile(o.fn_seg_dups)

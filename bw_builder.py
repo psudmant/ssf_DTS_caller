@@ -14,8 +14,10 @@ from wnd_cp_data import wnd_cp_indiv
 from gglob import gglob
 
 class output:
-    def __init__(self):
+    def __init__(self, contig_prefix, output_contigs):
         self.outdata = []
+        self.contig_prefix=contig_prefix
+        self.output_contigs=output_contigs
     
     def add(self, contig, start, end, cp):
         rnd_cp = min(int(round(cps[i])), 10)
@@ -42,22 +44,27 @@ class output:
             else:
                 s_outdata.append(self.outdata[i])
         
-        fn_tmp = tempfile.NamedTemporaryFile(mode='w', dir="/tmp").name            
+        fn_tmp = tempfile.NamedTemporaryFile(mode='w', dir="/tmp").name
+        print fn_tmp
         with open(fn_tmp, 'w') as F:
             for l in s_outdata:
                 contig, start, end, cp = l
-                print >>F, "\t".join([contig,str(start),str(end),indiv,"0","+","0","0",color_hash[cp]]) 
+                print >>F, "\t".join(["%s%s"%(self.contig_prefix,contig),str(start),str(end),indiv,"0","+","0","0",color_hash[cp]]) 
             
-        hg19_contigs = "/net/eichler/vol7/home/psudmant/genomes/contigs/hg19_contigs.txt"
-        cmd = "/net/eichler/vol7/home/psudmant/local_installations/ucscOLD/ucsc/bin/bedToBigBed %s %s %s"%(fn_tmp,hg19_contigs,fn_out)
+        #hg19_contigs = "/net/eichler/vol7/home/psudmant/genomes/contigs/hg19_contigs.txt"
+        contigs = self.output_contigs 
+        cmd = "/net/eichler/vol7/home/psudmant/local_installations/ucscOLD/ucsc/bin/bedToBigBed %s %s %s"%(fn_tmp,contigs,fn_out)
         track_def = """track type=bigBed name="%s_%s" description="%s_%s" visibility=dense itemRgb="On" dataUrl=%s\n"""%(indiv, 
                                                                                                                          name, 
                                                                                                                          indiv,
                                                                                                                          name,
                                                                                                                          fn_out)
-        os.system(cmd)
+        print cmd 
+        ret = os.system(cmd)
+        if ret != 0:
+            exit(ret)
         print fn_tmp
-        #os.unlink(fn_tmp)
+        os.unlink(fn_tmp)
         fn_out_td = "%s.trackdef"%(fn_out)
         with open(fn_out_td,'w') as F:
             F.write(track_def)
@@ -73,7 +80,9 @@ if __name__=="__main__":
     #opts.add_option('','--wnd_slide',dest='wnd_slide', type=int, default=None)
     opts.add_option('','--out_dir',dest='out_dir')
     opts.add_option('','--fn_out',dest='fn_out')
+    opts.add_option('','--contig_prefix',dest='contig_prefix', default="")
     opts.add_option('','--DTS_prefix',dest='DTS_prefix', default="500_bp_")
+    opts.add_option('','--output_contigs',dest='output_contigs', default="/net/eichler/vol7/home/psudmant/genomes/contigs/hg19_contigs.txt")
 
     
     (o, args) = opts.parse_args()
@@ -86,7 +95,7 @@ if __name__=="__main__":
     chr start end indiv 0 0 0 color
     """
     
-    c_out = output() 
+    c_out = output(o.contig_prefix, o.output_contigs) 
     for contig in wnd_cp.contigs:   
         print  >>stderr, contig
         

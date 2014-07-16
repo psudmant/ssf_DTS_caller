@@ -93,7 +93,7 @@ class indiv_callset_table(callset_table):
         """
         apply size cutoff (no calls of size 1 window!)
         """
-        print >>stderr, "parsing calls with p<=%f and l>=%d..."%(p_cutoff, size_cutoff)
+        print >>stderr, "parsing calls with p<=%.4g and l>=%d..."%(p_cutoff, size_cutoff)
         print >>stderr, "initial table size: %d"%(self.pd_table.shape[0])
         if divide_by_mu: 
             where_p_sig=((self.pd_table['p']/np.exp((self.pd_table['mu']**2)))<p_cutoff)
@@ -109,7 +109,6 @@ class indiv_callset_table(callset_table):
         #                                (self.pd_table['p']>0) )]
         print >>stderr, "final table size: %d"%(self.pd_table.shape[0])
         print >>stderr, "done"
-
 
 class simple_call:
         

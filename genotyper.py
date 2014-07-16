@@ -888,6 +888,7 @@ class GMM_gt(object):
         info_ob.update_entry(entry,"contig", contig)
         info_ob.update_entry(entry,"start", s)
         info_ob.update_entry(entry,"end", e)
+        info_ob.update_entry(entry,"GC", g.GC_inf.get_GC(contig, s, e))
         info_ob.update_entry(entry,"mu_mu_d", mu_mu_d)
         info_ob.update_entry(entry,"max_mu_d", max_mu_d)
         info_ob.update_entry(entry,"min_mu_d", min_mu_d)
@@ -1526,8 +1527,10 @@ class genotyper(object):
         fn_fasta  = kwargs.get("fn_fa", None)
         
         dup_tabix  = kwargs.get("dup_tabix", None)
-        
+        GC_inf  = kwargs.get("GC_inf", None)
+
         self.dup_tabix = dup_tabix
+        self.GC_inf = GC_inf
         self.contig = contig
         self.indivs = []
         self.wnd_starts = None

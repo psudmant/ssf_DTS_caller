@@ -267,7 +267,7 @@ class ssf_caller:
         return final_wnds
         
 
-    def get_callset(self, exclude_tbxs=[], min_exclude_ratio=0.3):
+    def get_callset(self, exclude_tbxs=[], min_exclude_ratio=0.3, min_exclude_len=20000):
         """
         return segments and their copies in genome 
         coordinates
@@ -287,8 +287,10 @@ class ssf_caller:
                 ex_starts, ex_ends = [], []
                 for l in exclude_tbx.fetch(self.chr,start,end,parser=pysam.asTuple()):
                     _chr,_s,_e = l
-                    ex_starts.append(int(_s))
-                    ex_ends.append(int(_e))
+                    _s, _e = int(_s), int(_e)
+                    if _e-_s > min_exclude_len:
+                        ex_starts.append(_s)
+                        ex_ends.append(_e)
 
             n_exclude = len(ex_starts) 
             if n_exclude:

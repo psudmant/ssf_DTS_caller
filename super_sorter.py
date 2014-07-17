@@ -45,7 +45,7 @@ class comparator:
                     
         return pos_tups 
 
-    def get_coordinates(self, contig, wnd_starts, wnd_ends, poses, mus):
+    def get_coordinates(self, contig, wnd_starts, wnd_ends, poses, mus_1, mus_2):
 
         out_coords = []
         
@@ -55,7 +55,7 @@ class comparator:
         tups = self.get_adjacent_wnds(poses)
         for t in tups:
             p1, p2 = t
-            out_coords.append([contig, wnd_starts[p1], wnd_ends[p2-1],np.mean(mus[p1:p2])])
+            out_coords.append([contig, wnd_starts[p1], wnd_ends[p2-1],np.mean(mus_1[p1:p2]),np.mean(mus_2[p1:p2])])
 
         return out_coords
           
@@ -124,10 +124,11 @@ class comparator:
         max_g2 = np.max(cps[idx_2,:],0)
         
         mu_g1 = np.mean(cps[idx_1,:],0)
+        mu_g2 = np.mean(cps[idx_2,:],0)
 
         delta = min_g1-max_g2
         poses = np.where(delta>min_delta)[0]
-        return self.get_coordinates(contig, wnd_starts, wnd_ends, poses, mu_g1)
+        return self.get_coordinates(contig, wnd_starts, wnd_ends, poses, mu_g1, mu_g2)
     
     def test_pop_spec_del(self, contig, cps, wnd_starts, wnd_ends,  group1, group2, min_delta=1):
         """
@@ -140,10 +141,11 @@ class comparator:
         min_g2 = np.min(cps[idx_2,:],0)
         
         mu_g1 = np.mean(cps[idx_1,:],0)
+        mu_g2 = np.mean(cps[idx_2,:],0)
 
         delta = min_g2-max_g1
         poses = np.where(delta>min_delta)[0]
-        return self.get_coordinates(contig, wnd_starts, wnd_ends, poses, mu_g1)
+        return self.get_coordinates(contig, wnd_starts, wnd_ends, poses, mu_g1, mu_g2)
 
 class bed_output:
     def __init__(self, fn_out):
@@ -156,7 +158,7 @@ class bed_output:
     def output(self):
         with open(self.fn_out,'w') as F:
             for c in self.coords:
-                F.write("%s\t%d\t%d\t%f\n"%(c[0],c[1],c[2],c[3]))
+                F.write("%s\t%d\t%d\t%f\t%f\n"%(c[0],c[1],c[2],c[3],c[4]))
 
 if __name__=="__main__":
          

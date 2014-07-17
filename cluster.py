@@ -17,6 +17,7 @@ import networkx as nx
 import time
 import pysam
 import math
+import pdb
 
 from sets import Set
 
@@ -89,7 +90,7 @@ class indiv_callset_table(callset_table):
             Fout.write("%s\t%d\t%d\t%f_%s\t%f\t+\t%d\t%d\t%s\n"%(chr,start,end,p,ref,mu,start,end,"0,0,0"))
         Fout.close()
 
-    def filter(self, p_cutoff, size_cutoff, single_window_cutoff, divide_by_mu=False):
+    def filter(self, p_cutoff, size_cutoff, single_window_cutoff, divide_by_mu=False, min_mu=0.5):
         """
         apply size cutoff (no calls of size 1 window!)
         """
@@ -97,12 +98,15 @@ class indiv_callset_table(callset_table):
         print >>stderr, "initial table size: %d"%(self.pd_table.shape[0])
         if divide_by_mu: 
             where_p_sig=((self.pd_table['p']/np.exp((self.pd_table['mu']**2)))<p_cutoff)
-            where_mu_sig=(np.absolute(self.pd_table['mu'])>0.5)
+            where_mu_sig=(np.absolute(self.pd_table['mu'])>min_mu)
             self.pd_table = self.pd_table[(where_p_sig | where_mu_sig)]
+            print "p-sig:", np.sum(where_p_sig)
+            print "mu-sig:", np.sum(where_mu_sig)
         else:
             self.pd_table = self.pd_table[(self.pd_table['p']<p_cutoff)]
 
         self.pd_table = self.pd_table[(self.pd_table['window_size']>=size_cutoff)]
+        
         ##for windows of size 1, if they exist, ensure they exceed the max_mu
         #self.pd_table = self.pd_table[((self.pd_table['window_size']>1)|(np.absolute(self.pd_table['mu'])>=single_window_cutoff))]
         #self.pd_table = self.pd_table[( (self.pd_table['window_size']>=size_cutoff) |

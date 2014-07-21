@@ -59,30 +59,6 @@ class comparator:
 
         return out_coords
           
-        """
-        self.get_adjacent_wnds(np.array([9,10,11,25,26,30,40,55]))
-        self.get_adjacent_wnds(np.array([9,11,25,26,30]))
-        self.get_adjacent_wnds(np.array([9,11,25,26]))
-        exit(1)
-        self.get_adjacent_wnds(poses)
-        print poses[0:1000]
-
-        curr_cps = [mus[poses[0]]] 
-        out_coords.append([contig, wnd_starts[poses[0]], wnd_ends[poses[0]],np.mean(np.array(curr_cps))])
-        for i in xrange(1,poses.shape[0]):
-            if i%1000 == 0: print i
-
-            if poses[i] == poses[i-1]+1: 
-                out_coords[-1][2] = wnd_ends[poses[i]]
-                curr_cps.append(mus[poses[i]]) 
-                out_coords[-1][3] = np.mean(np.array(curr_cps))
-            else:
-                curr_cps = [mus[poses[i]]] 
-                out_coords.append([contig, wnd_starts[poses[i]], wnd_ends[poses[i]], np.mean(np.array(curr_cps))])
-        
-        return out_coords
-        """
-
 
     def test_all_lt(self, contig, cps, wnd_starts, wnd_ends, max_cp=0.3):
         """
@@ -191,6 +167,8 @@ if __name__=="__main__":
     opts.add_option('','--test_group1_del',dest='t_g1_del', default=False, action='store_true')
     opts.add_option('','--test_all_dup',dest='t_all_dup', default=False, action='store_true')
     
+    opts.add_option('','--min_delta',dest='min_delta', default=1.0, type=float)
+    
     #opts.add_option('','--gglob_dir',dest='gglob_dir')
 
     (o, args) = opts.parse_args()
@@ -243,33 +221,33 @@ if __name__=="__main__":
                                 fn_sunk_contigs = o.fn_sunk_contigs)
         
         if o.t_g1_dup:
-            coords = comp.test_pop_spec_dup(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, "group1", "group2")
+            coords = comp.test_pop_spec_dup(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, "group1", "group2", min_delta=o.min_delta)
             dups_out.add(coords)
-            sunk_coords = comp.test_pop_spec_dup(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, "group1", "group2")
+            sunk_coords = comp.test_pop_spec_dup(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, "group1", "group2", min_delta=o.min_delta)
             sunk_dups_out.add(sunk_coords)
         
         if o.t_g1_del:
-            coords = comp.test_pop_spec_del(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, "group1", "group2")
+            coords = comp.test_pop_spec_del(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, "group1", "group2", min_delta=o.min_delta)
             dels_out.add(coords)
-            sunk_coords = comp.test_pop_spec_del(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, "group1", "group2")
+            sunk_coords = comp.test_pop_spec_del(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, "group1", "group2", min_delta=o.min_delta)
             sunk_dels_out.add(sunk_coords)
         
         if o.t_all_dup:
-            coords = comp.test_all_dup(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends)
+            coords = comp.test_all_dup(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, min_delta=o.min_delta)
             all_dup_out.add(coords)
-            sunk_coords = comp.test_all_dup(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends)
+            sunk_coords = comp.test_all_dup(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, min_delta=o.min_delta)
             all_sunk_dup_out.add(sunk_coords)
 
         if o.t_all_lt:
-            coords = comp.test_all_lt(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, max_cp = o.t_all_lt)
+            coords = comp.test_all_lt(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, max_cp = o.t_all_lt, min_delta=o.min_delta)
             all_lt_out.add(coords)
-            sunk_coords = comp.test_all_lt(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, max_cp = o.t_all_lt)
+            sunk_coords = comp.test_all_lt(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, max_cp = o.t_all_lt, min_delta=o.min_delta)
             all_sunk_lt_out.add(sunk_coords)
         
         if o.t_all_gt:
-            coords = comp.test_all_gt(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, min_cp = o.t_all_gt)
+            coords = comp.test_all_gt(contig, g.cp_matrix, g.wnd_starts, g.wnd_ends, min_cp = o.t_all_gt, min_delta=o.min_delta)
             all_gt_out.add(coords)
-            sunk_coords = comp.test_all_gt(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, min_cp = o.t_all_gt)
+            sunk_coords = comp.test_all_gt(contig, g.sunk_cp_matrix, g.sunk_wnd_starts, g.sunk_wnd_ends, min_cp = o.t_all_gt, min_delta=o.min_delta)
             all_sunk_gt_out.add(sunk_coords)
 
     if o.t_g1_dup:

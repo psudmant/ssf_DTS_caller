@@ -325,7 +325,7 @@ def cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, max_uniq_thresh):
     return new_inds_by_seg
                 
      
-def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
+def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot_dir="./plotting/test", plot=False):
     """
     First chop up into ALL constituate parts
     """
@@ -345,7 +345,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
     #merge correllated calls
     #commented for now...
     """
-    s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, lambda_r_cutoff, "./plotting/test", do_plot=plot)
+    s_e_segs, c, mus = get_correlated_segments(all_starts_ends, g, contig, lambda_r_cutoff, plot_dir, do_plot=plot)
      
     mu_cp = np.mean(mus) 
     print "%d segs merged to %d correlated segs"%(len(all_starts_ends), len(s_e_segs))
@@ -443,7 +443,7 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=False):
             indivs_by_cnv_segs = cluster_overlapping_idGTs(indivs_by_cnv_segs, g, contig, max_uniq_thresh)
         
         if plot: 
-            m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test", g, indivs_by_cnv_segs, [], CNV_segs, cnv_segs_by_indiv)
+            m_cluster.cluster_callsets.plot(overlapping_call_clusts, plot_dir, g, indivs_by_cnv_segs, [], CNV_segs, cnv_segs_by_indiv)
         
         #m_cluster.cluster_callsets.plot(overlapping_call_clusts, "./plotting/test/", g, c, s_e_segs, CNV_segs, cnv_segs_by_indiv) 
         
@@ -1292,7 +1292,7 @@ def assess_GT_overlaps(gmm):
     return u_o, med_o, overlaps
     
         
-def output(g, contig, s, e, filt, include_indivs=None, plot=False, v=False):
+def output(g, contig, s, e, filt, include_indivs=None, plot_dir="./plotting/test", plot=False, v=False):
 
     print "%s %d %d"%(contig, s, e)
     stdout.flush()
@@ -1328,7 +1328,7 @@ def output(g, contig, s, e, filt, include_indivs=None, plot=False, v=False):
         print "plotting %s %d %d"%(contig, s, e)
         Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
         gXs = g.GMM_genotype(Xs, include_indivs = include_indivs)
-        g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, overlaps, fn="./plotting/test/%s_%d_%d.png"%(contig, s, e))
+        g.plot(gX, gXs, contig, s, e, idx_s, idx_e, s_idx_s, s_idx_e, overlaps, fn="%s/%s_%d_%d.png"%(plot_dir, contig, s, e))
 
 
 class genotyper(object):

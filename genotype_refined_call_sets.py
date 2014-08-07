@@ -161,7 +161,7 @@ if __name__=='__main__':
                 #if contig == "chr20" and not (start==6648036 and end==6656183): continue
                 gt.output(g, contig, start, end, filt, plot=do_plot,v=verbose)  
         else:
-            s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot=do_plot)
+            s_e_segs, include_indivs, non_adj = gt.assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot_dir=o.out_viz_dir, plot=do_plot)
 
             
             if len(s_e_segs)<=1 or non_adj:

@@ -1089,8 +1089,7 @@ class GMM_gt(object):
         delta = bic_r-self.min_bic+bic_l-self.min_bic
         return delta
         
-    def get_gts_by_indiv(self):
-        
+    def get_gts_by_indiv(self, correct_for_odd_major = True):
         cp_2_thresh=1.0
         mode_label = int(mode(self.labels)[0][0])
         
@@ -1128,7 +1127,7 @@ class GMM_gt(object):
             labels_to_gt = new_labels_to_gt
        
         ##correct for odd major alleles out of HWE 
-        if (labels_to_gt[mode_label] %2 == 1) and np.sum(indiv_labels==mode_label) >= .5*(indiv_labels.shape[0]):
+        if correct_for_odd_major and (labels_to_gt[mode_label] %2 == 1) and np.sum(indiv_labels==mode_label) >= .5*(indiv_labels.shape[0]):
             d=0
             if self.label_to_mu[mode_label]-labels_to_gt[mode_label]>0 or min(labels_to_gt.values())==0:
                 d=1
@@ -1770,6 +1769,16 @@ class genotyper(object):
 
         return gmm, labels, aic 
     
+    def simple_GMM_genotype(self, X, max_cp=12):
+        
+        mus = np.mean(X,1)
+        if np.amax(mus)>max_cp:
+            gts_by_indiv = {self.indivs[i]:mus[i] for i in xrange(mus.shape[0])}
+        else:
+            gX = GMM_genotype(X)
+            gts_by_indiv, gts_to_label, labels_to_gt = gX.get_gts_by_indiv(X)
+
+        return gts_by_indiv
 
     def GMM_genotype(self, X, include_indivs = None, FOUT = None, overload_indivs = None):
         """

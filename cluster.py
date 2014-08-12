@@ -211,7 +211,9 @@ class indiv_cluster_calls:
                     and genotype to ensure this seg is var
                     """
                     d = self.get_delta(clust, wnd_starts, wnd_ends, curr_dCGHs, indiv_cps, ref_cps)
-
+                    if clust.size == 1: 
+                        print "skipping single call cluster"
+                        continue
                     if d > 1.0:
                         variable_clusts.append(clust)
                     elif d>min_d:

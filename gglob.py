@@ -119,7 +119,7 @@ class gglob:
         wnd_size = idx_data['wnd_size'] 
         wnd_slide = idx_data['wnd_slide'] 
         contig = contig
-       
+               
         keys = ["wnd_starts","wnd_ends","cp_matrix","sunk_wnd_starts","sunk_wnd_ends","sunk_cp_matrix"]
         fn_in = "%s/%s"%(gglob_dir,contig)
 

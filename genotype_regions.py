@@ -43,6 +43,8 @@ def gglob_get_cp_by_regions(cps, wnd_starts, wnd_ends, contig, start, end):
     l = cps.shape[1]
     wnd_start = np.searchsorted(wnd_starts[0], start)
     wnd_end = min(np.searchsorted(wnd_ends[0], end)+1,l-1)
+    if wnd_end<=wnd_start:
+        wnd_end=wnd_start+1
     copies = np.median(cps.ix[:, wnd_start:wnd_end+1],1)
     return copies.tolist()
 

@@ -19,11 +19,14 @@ if __name__=='__main__':
 
     opts.add_option('','--fn_gts',dest='fn_gts')
     opts.add_option('','--fn_out',dest='fn_out')
-    opts.add_option('','--exclude_indivs',dest='exclude_indivs')
+    opts.add_option('','--exclude_indivs',dest='exclude_indivs', default=None)
     
     (o, args) = opts.parse_args()
     
-    exclude_indivs = o.exclude_indivs.split(":")
+    if o.exclude_indivs is not None:
+        exclude_indivs = o.exclude_indivs.split(":")
+    else:
+        exclude_indivs = []
     
     FIN = open(o.fn_gts)
     FOUT = open(o.fn_out,'w')

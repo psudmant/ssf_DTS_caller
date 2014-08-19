@@ -1,4 +1,4 @@
-from optparse import OptionParser
+import argparse
 import pandas as pd
 from sys import stderr
 from collections import defaultdict
@@ -41,43 +41,33 @@ def output_indiv_clust_elements(final_calls, fn):
 
 if __name__=="__main__":
     
-    opts = OptionParser()
-    opts.add_option('', '--call_table', dest='fn_call_table')
-    opts.add_option('', '--out_indiv_calls_bed', dest='fn_out_indiv_calls_bed')
-    opts.add_option('', '--out_clustered_calls_bed', dest='fn_out_clustered_calls_bed')
-    opts.add_option('', '--out_resolved', dest='fn_out_resolved')
-    opts.add_option('', '--p_cutoff', dest='p_cutoff', type=float, default=0.005)
-    opts.add_option('', '--min_wnd_call_size', dest='min_wnds', type=int, default=2)
-    opts.add_option('', '--max_callsize', dest='max_callsize', type=int, default=200000)
-    opts.add_option('', '--segdups', dest='fn_seg_dups')
-    opts.add_option('', '--min_overlapping_calls', dest='min_overlapping_calls', type=int, default=3)
-    opts.add_option('', '--single_window_cutoff', dest='single_window_cutoff', type=float, default=1.0)
-    opts.add_option('', '--limit_to_chr', dest='limit_to_chr', default=None)
-    opts.add_option('', '--indiv_DTS', dest='fn_indiv_DTS', default=None)
-    opts.add_option('', '--ref_DTS', dest='fn_ref_DTS', default=None)
-    
-    opts.add_option('', '--gglob_dir', dest='gglob_dir', default=None)
-    opts.add_option('', '--out_viz_dir', dest='viz_dir', default="./")
-     
-    opts.add_option('', '--contigs', dest='fn_contigs', default=None)
-    opts.add_option('', '--window_size', dest='window_size', type=int, default=None)
-    opts.add_option('', '--min_ref_cp_delta', dest='min_d', type=float, default=0)
-    
-    opts.add_option('', '--no_P_value_adjust', dest='P_adjust', action='store_false',  default=True)
-    opts.add_option('', '--min_mu', dest='min_mu', default=0.5, type=float)
+    parser = argparse.ArgumentParser()
 
-    """
-        min_delta - the min mean cp distance between an individual and the refs it was called against 
-    """
-    
-    opts.add_option('', '--subset_indivs', dest='subset_indivs', default=None)
+    parser.add_argument('--call_table', dest='fn_call_table', required=True, help='Call table file name')
+    parser.add_argument('--out_indiv_calls_bed', dest='fn_out_indiv_calls_bed', help='Output filename for individual calls')
+    parser.add_argument('--out_clustered_calls_bed', dest='fn_out_clustered_calls_bed')
+    parser.add_argument('--out_resolved', dest='fn_out_resolved')
+    parser.add_argument('--p_cutoff', type=float, default=0.005, help='P-value call cutoff (Default: %(default)s)')
+    parser.add_argument('--min_wnd_call_size', dest='min_wnds', type=int, default=2, help='Min windows included in call (Default: %(default)s)')
+    parser.add_argument('--max_callsize', type=int, default=200000, help='Calls must be <%(default)s bp')
+    parser.add_argument('--segdups', dest='fn_seg_dups', help='Path to segdups file')
+    parser.add_argument('--min_overlapping_calls', type=int, default=3, help='Min number of overlapping dCGH calls (Default: %(default)s)')
+    parser.add_argument('--single_window_cutoff', type=float, default=1.0, help='Variance cutoff for single window calls (zero variance messes things up)')
+    parser.add_argument('--limit_to_chr', dest='limit_to_chr', default=None, help='List of chrs to include (:-separated, default: %(default)s)')
+    parser.add_argument('--indiv_DTS', dest='fn_indiv_DTS', default=None, help='Single sample DTS')
+    parser.add_argument('--ref_DTS', dest='fn_ref_DTS', default=None, help='Single reference DTS')
+    parser.add_argument('--gglob_dir', default=None, help='Path to gglob directory')
+    parser.add_argument('--out_viz_dir', dest='viz_dir', default="./", help='Path to output viz directory (Default: %(default)s)')
+    parser.add_argument('--contigs', dest='fn_contigs', default=None, help='Path to tab-delimited table of contigs and contig lengths')
+    parser.add_argument('--window_size', type=int, default=None, help='Size of SUNK/wssd sliding windows')
+    parser.add_argument('--min_ref_cp_delta', dest='min_d', type=float, default=0, help='Smallest difference in cp between ref and sample to consider (Default: %(default)s)')
+    parser.add_argument('--no_P_value_adjust', dest='P_adjust', action='store_false')
+    parser.add_argument('--min_mu', default=0.5, type=float, help='Minimum cluster mean (Default: %(default)s)')
+    parser.add_argument('--subset_indivs', default=None, help='Colon-separated list of individuals to consider (Default: %(default)s)')
 
-    """
-        min_overlapping_calls in the minimum # of calls
-    """
-    
-    (o, args) = opts .parse_args()
-    
+    o = parser.parse_args()    
+
+
     subset_indivs = o.subset_indivs
     
     if subset_indivs != None:

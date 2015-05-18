@@ -469,6 +469,8 @@ def assess_complex_locus(overlapping_call_clusts, g, contig, filt, plot_dir="./p
                 mus = np.mean(X,1)
                 if g.is_segdup(contig, s, e) or np.mean(mus)>=3 or np.amax(mus) >2.5:
                     Xs, s_idx_s, s_idx_e = g.get_sunk_gt_matrix(contig, s, e)
+                    if Xs.size == 0:
+                        continue
                     gXs = g.GMM_genotype(Xs)
                     if gXs.n_clusts == 1:
                         continue
